@@ -90,8 +90,6 @@ enum sel_inos {
 	SEL_STATUS,	/* export current status using mmap() */
 	SEL_POLICY,	/* allow userspace to read the in kernel policy */
 	SEL_VALIDATE_TRANS, /* compute validatetrans decision */
-	SEL_APS,
-	SEL_ASUS,
 	SEL_INO_NEXT,	/* The next inode number to use */
 };
 
@@ -173,118 +171,6 @@ static const struct file_operations sel_enforce_ops = {
 	.write		= sel_write_enforce,
 	.llseek		= generic_file_llseek,
 };
-
-static ssize_t sel_write_aps(struct file *file, const char __user *buf,
-					size_t count, loff_t *ppos)
-{
-	char *page = NULL;
-	ssize_t length;
-	int new_value;
-
-	length = -ENOMEM;
-	if (count >= PAGE_SIZE)
-		goto out;
-
-	/* No partial writes. */
-	length = EINVAL;
-	if (*ppos != 0)
-		goto out;
-
-	length = -ENOMEM;
-	page = (char *)get_zeroed_page(GFP_KERNEL);
-	if (!page)
-		goto out;
-
-	length = -EFAULT;
-	if (copy_from_user(page, buf, count))
-		goto out;
-
-	length = -EINVAL;
-	if (sscanf(page, "%d", &new_value) != 1)
-		goto out;
-
-	if (new_value != security_get_aps()) {
-		security_set_aps(new_value);
-	}
-	length = count;
-out:
-	free_page((unsigned long) page);
-	return length;
-}
-
-
-static ssize_t sel_read_aps(struct file *filp, char __user *buf,
-					size_t count, loff_t *ppos)
-{
-	char tmpbuf[TMPBUFLEN];
-	ssize_t length;
-
-	length = scnprintf(tmpbuf, TMPBUFLEN, "%d", security_get_aps());
-	return simple_read_from_buffer(buf, count, ppos, tmpbuf, length);
-}
-
-static const struct file_operations sel_aps_ops = {
-	.read		= sel_read_aps,
-	.write		= sel_write_aps,
-	.llseek		= generic_file_llseek,
-};
-
-
-
-static ssize_t sel_write_asus(struct file *file, const char __user *buf,
-					size_t count, loff_t *ppos)
-{
-	char *page = NULL;
-	ssize_t length;
-	int new_value;
-	length = -ENOMEM;
-	if (count >= PAGE_SIZE)
-		goto out;
-	/* No partial writes. */
-	length = EINVAL;
-	if (*ppos != 0)
-		goto out;
-	length = -ENOMEM;
-	page = (char *)get_zeroed_page(GFP_KERNEL);
-	if (!page)
-		goto out;
-	length = -EFAULT;
-	if (copy_from_user(page, buf, count))
-		goto out;
-
-	length = -EINVAL;
-	if (sscanf(page, "%d", &new_value) != 1)
-		goto out;
-
-	if (new_value != security_get_asus()) {
-		security_set_asus(new_value);
-	}
-	length = count;
-out:
-	free_page((unsigned long) page);
-	return length;
-}
-
-
-static ssize_t sel_read_asus(struct file *filp, char __user *buf,
-					size_t count, loff_t *ppos)
-{
-	char tmpbuf[TMPBUFLEN];
-	ssize_t length;
-
-	length = scnprintf(tmpbuf, TMPBUFLEN, "%d", security_get_asus());
-	return simple_read_from_buffer(buf, count, ppos, tmpbuf, length);
-}
-
-static const struct file_operations sel_aps_asus = {
-	.read		= sel_read_asus,
-	.write		= sel_write_asus,
-	.llseek		= generic_file_llseek,
-};
-
-
-
-
 
 static ssize_t sel_read_handle_unknown(struct file *filp, char __user *buf,
 					size_t count, loff_t *ppos)
@@ -1930,8 +1816,6 @@ static int sel_fill_super(struct super_block *sb, void *data, int silent)
 		[SEL_POLICY] = {"policy", &sel_policy_ops, S_IRUGO},
 		[SEL_VALIDATE_TRANS] = {"validatetrans", &sel_transition_ops,
 					S_IWUGO},
-		[SEL_APS] = {"aps", &sel_aps_ops, S_IRUGO|S_IWUSR},
-		[SEL_ASUS] = {"log", &sel_aps_asus, S_IRUGO|S_IWUSR|S_IWGRP|S_IWOTH},
 		/* last one */ {""}
 	};
 	ret = simple_fill_super(sb, SELINUX_MAGIC, selinux_files);
