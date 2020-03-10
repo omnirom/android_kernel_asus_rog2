@@ -1349,6 +1349,7 @@ int goodix_ts_input_dev_config(struct goodix_ts_core *core_data)
 	input_dev->id.vendor = 0xBEEF;
 	input_dev->id.version = 10427;
 
+	__set_bit(KEY_WAKEUP, input_dev->evbit);
 	__set_bit(EV_SYN, input_dev->evbit);
 	__set_bit(EV_KEY, input_dev->evbit);
 	__set_bit(EV_ABS, input_dev->evbit);
@@ -1377,7 +1378,7 @@ int goodix_ts_input_dev_config(struct goodix_ts_core *core_data)
 #endif
 #endif
 
-	input_set_capability(input_dev, EV_KEY, KEY_POWER);
+	input_set_capability(input_dev, EV_KEY, KEY_WAKEUP);
 
 	r = input_register_device(input_dev);
 	if (r < 0) {
