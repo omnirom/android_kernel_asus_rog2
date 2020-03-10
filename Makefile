@@ -943,9 +943,7 @@ KBUILD_CPPFLAGS += $(ARCH_CPPFLAGS) $(KCPPFLAGS)
 KBUILD_AFLAGS   += $(ARCH_AFLAGS)   $(KAFLAGS)
 KBUILD_CFLAGS   += $(ARCH_CFLAGS)   $(KCFLAGS)
 
-ifeq ($(TARGET_BUILD_VARIANT), user)
 KBUILD_CPPFLAGS += -DASUS_SHIP_BUILD=1
-endif
 
 # Use --build-id when available.
 LDFLAGS_BUILD_ID := $(patsubst -Wl$(comma)%,%,\
