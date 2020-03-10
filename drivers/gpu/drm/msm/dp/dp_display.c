@@ -72,35 +72,6 @@ extern bool is_in_dp_disconnect;
 
 #define HPD_STRING_SIZE 30
 
-char verifiedbootstate[20];
-char unlock[2];
-static int __init verified_boot_state_param(char *line)
-{
-	strlcpy(verifiedbootstate, line, sizeof(verifiedbootstate));
-	return 1;
-}
-
-__setup("androidboot.verifiedbootstate=", verified_boot_state_param);
-
-static int __init unlock_param(char *line)
-{
-	strlcpy(unlock, line, sizeof(unlock));
-	return 1;
-}
-
-__setup("UNLOCKED", unlock_param);
-
-static bool is_unlocked(void)
-{
-	static const char unlockedstate[] = "orange";
-	static const char unlockedparam[] = "Y";
-
-    pr_err("verifiedbootstate=%s\n", verifiedbootstate);
-    pr_err("UNLOCKED=%s\n", unlock);
-	return (!strncmp(verifiedbootstate, unlockedstate, sizeof(unlockedstate))
-	        || !strncmp(unlock, unlockedparam, sizeof(unlockedparam)));
-}
-
 struct dp_hdcp_dev {
 	void *fd;
 	struct sde_hdcp_ops *ops;
@@ -1543,12 +1514,7 @@ static int dp_init_sub_modules(struct dp_display_private *dp)
 
 	dp->tot_dsc_blks_in_use = 0;
 
-    if (is_unlocked()) {
-        pr_err("Disable hdcp for unlocked device\n");
-        dp->debug->hdcp_disabled = 1;
-    } else {
-	    dp->debug->hdcp_disabled = hdcp_disabled;
-	}
+	dp->debug->hdcp_disabled = hdcp_disabled;
 	dp_display_update_hdcp_status(dp, true);
 
 	dp_display_get_usb_extcon(dp);
