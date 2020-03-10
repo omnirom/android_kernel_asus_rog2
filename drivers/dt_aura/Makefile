@@ -2,5 +2,5 @@
 # Makefile for aura sync drivers.
 #
 
-obj-m       += ene_8k41_dt.o
+obj-y       += ene_8k41_dt.o
 

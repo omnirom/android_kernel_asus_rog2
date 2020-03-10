@@ -1426,7 +1426,7 @@ static int ene_8k41_remove(struct i2c_client *client)
 	return 0;
 }
 
-int ene_8k41_suspend(struct device *dev)
+int ene_8k41_dt_aura_suspend(struct device *dev)
 {
 	int err = 0;
 
@@ -1443,7 +1443,7 @@ int ene_8k41_suspend(struct device *dev)
 	return err;
 }
 
-int ene_8k41_resume(struct device *dev)
+int ene_8k41_dt_aura_resume(struct device *dev)
 {
 	int err = 0;
 
@@ -1468,8 +1468,8 @@ static const struct i2c_device_id ene_8k41_id[] = {
 //MODULE_DEVICE_TABLE(i2c, ene_8k41_id);
 
 static const struct dev_pm_ops ene_8k41_pm_ops = {
-	.suspend	= ene_8k41_suspend,
-	.resume	= ene_8k41_resume,
+	.suspend	= ene_8k41_dt_aura_suspend,
+	.resume	= ene_8k41_dt_aura_resume,
 };
 
 #ifdef CONFIG_OF

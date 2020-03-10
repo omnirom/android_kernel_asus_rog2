@@ -27,8 +27,8 @@ static struct ene_6k582_platform_data *g_pdata;
 u32 addr_reg;
 int g_fw_size=0;
 int apply_pending=0;
-int mode2_state=0;
-int apply_state=0;
+int ene_mode2_state=0;
+int ene_apply_state=0;
 u32 g_delay_time=0;
 int g_update_state=-1;
 int g_panel_state=-1; // 1-->panel on  0--> panel off
@@ -887,11 +887,11 @@ static ssize_t apply_store(struct device *dev, struct device_attribute *attr, co
 	ssize_t ret;
 	int sleep_val=0;
 	unsigned char data_r[2]={0};
-	apply_state=0;
+	ene_apply_state=0;
 
 	ret = kstrtou32(buf, 10, &val);
 	if (ret){
-		apply_state=-1;
+		ene_apply_state=-1;
 		return count;
 	}
 	pr_debug("[AURA_POGO] %s val=%d \n",__func__,val);
@@ -900,13 +900,13 @@ static ssize_t apply_store(struct device *dev, struct device_attribute *attr, co
 			printk("[AURA_POGO] Send apply. RGB:%d %d %d, mode:%d, speed:%d, led_on:%d, led2_on:%d\n", g_red, g_green, g_blue, g_mode, g_speed, g_led_on, g_led2_on);
 			err = ene_6k582_write_bytes(client, 0x8452, 1);
 			if (err !=1){
-				apply_state=-1;
+				ene_apply_state=-1;
 				printk("[AURA_POGO] ene_6k582_write_bytes:err %d\n", err);
 			}
 			//apply_pending=0;
 
 	} else{
-		apply_state=-1;
+		ene_apply_state=-1;
 		printk("[AURA_POGO] No send apply cmd.\n");
 	}
 	mutex_unlock(&g_pdata->ene_mutex);
@@ -1003,7 +1003,7 @@ static ssize_t apply_store(struct device *dev, struct device_attribute *attr, co
 static ssize_t apply_show(struct device *dev, struct device_attribute *attr,char *buf)
 {
 
-	return snprintf(buf, PAGE_SIZE,"%d\n", apply_state);
+	return snprintf(buf, PAGE_SIZE,"%d\n", ene_apply_state);
 }
 
 static ssize_t mode_store(struct device *dev, struct device_attribute *attr, const char *buf, size_t count)
@@ -1504,7 +1504,7 @@ static ssize_t mode2_store(struct device *dev, struct device_attribute *attr, co
 	int ntokens = 0;
 	const char *cp = buf;
 	const char *buf_tmp;
-	mode2_state=0;
+	ene_mode2_state=0;
 
 	sscanf(buf, "%d", &mode2);
 
@@ -1517,7 +1517,7 @@ static ssize_t mode2_store(struct device *dev, struct device_attribute *attr, co
 	if(ntokens > 6) 
 	{
 		printk("[AURA_POGO] mode2_store,wrong input,too many ntokens\n");
-		mode2_state=-1;
+		ene_mode2_state=-1;
 		return count;
 	}
 
@@ -1543,7 +1543,7 @@ static ssize_t mode2_store(struct device *dev, struct device_attribute *attr, co
 
 	if(rgb_num != ntokens*3){
 		printk("[AURA_POGO] mode2_store,wrong input,rgb_num != ntokens*3\n");
-		mode2_state=-1;
+		ene_mode2_state=-1;
 		return count;
 	}
 
@@ -1559,7 +1559,7 @@ static ssize_t mode2_store(struct device *dev, struct device_attribute *attr, co
 			if (err !=1){
 				printk("[AURA_POGO] ene_6k582_write_bytes:err %d\n", err);
 				mutex_unlock(&g_pdata->ene_mutex);
-				mode2_state=-1;
+				ene_mode2_state=-1;
 				return count;
 			}
 			mutex_unlock(&g_pdata->ene_mutex);
@@ -1568,7 +1568,7 @@ static ssize_t mode2_store(struct device *dev, struct device_attribute *attr, co
 		case 1: //6 color rainbow
 			if(ntokens!=6){
 				printk("[AURA_POGO] mode2_store,wrong input. ntokensis not 6\n");
-				mode2_state=-1;
+				ene_mode2_state=-1;
 				return count;
 			}
 			//printk("[AURA_POGO] mode2: 0x%x - 6 colors rainbow \n",  mode2);
@@ -1579,21 +1579,21 @@ static ssize_t mode2_store(struct device *dev, struct device_attribute *attr, co
 				if (err !=1){
 					printk("[AURA_POGO] ene_6k582_write_bytes:err %d\n", err);
 					mutex_unlock(&g_pdata->ene_mutex);
-					mode2_state=-1;
+					ene_mode2_state=-1;
 					return count;
 				}
 				err = ene_6k582_write_bytes(client, addr+0x10, rgb[i*3+1]);
 				if (err !=1){
 					printk("[AURA_POGO] ene_6k582_write_bytes:err %d\n", err);
 					mutex_unlock(&g_pdata->ene_mutex);
-					mode2_state=-1;
+					ene_mode2_state=-1;
 					return count;
 				}
 				err = ene_6k582_write_bytes(client, addr+0x20, rgb[i*3+2]);
 				if (err !=1){
 					printk("[AURA_POGO] ene_6k582_write_bytes:err %d\n", err);
 					mutex_unlock(&g_pdata->ene_mutex);
-					mode2_state=-1;
+					ene_mode2_state=-1;
 					return count;
 				}
 			}
@@ -1601,28 +1601,28 @@ static ssize_t mode2_store(struct device *dev, struct device_attribute *attr, co
 			if (err !=1){
 				printk("[AURA_POGO] ene_6k582_write_bytes:err %d\n", err);
 				mutex_unlock(&g_pdata->ene_mutex);
-				mode2_state=-1;
+				ene_mode2_state=-1;
 				return count;
 			}
 			err = ene_6k582_write_bytes(client, 0x820F, 0xE1);
 			if (err !=1){
 				printk("[AURA_POGO] ene_6k582_write_bytes:err %d\n", err);
 				mutex_unlock(&g_pdata->ene_mutex);
-				mode2_state=-1;
+				ene_mode2_state=-1;
 				return count;
 			}
 			err = ene_6k582_write_bytes(client, 0x8401, 0x02);
 			if (err !=1){
 				printk("[AURA_POGO] ene_6k582_write_bytes:err %d\n", err);
 				mutex_unlock(&g_pdata->ene_mutex);
-				mode2_state=-1;
+				ene_mode2_state=-1;
 				return count;
 			}
 			err = ene_6k582_write_bytes(client, 0x8451, 0xE1);
 			if (err !=1){
 				printk("[AURA_POGO] ene_6k582_write_bytes:err %d\n", err);
 				mutex_unlock(&g_pdata->ene_mutex);
-				mode2_state=-1;
+				ene_mode2_state=-1;
 				return count;
 			}
 			mutex_unlock(&g_pdata->ene_mutex);
@@ -1631,7 +1631,7 @@ static ssize_t mode2_store(struct device *dev, struct device_attribute *attr, co
 		case 2:  //static
 			if(ntokens!=2){
 				printk("[AURA_POGO] mode2_store,wrong input. ntokensis not 2\n");
-				mode2_state=-1;
+				ene_mode2_state=-1;
 				return count;
 			}
 			mutex_lock(&g_pdata->ene_mutex);
@@ -1642,21 +1642,21 @@ static ssize_t mode2_store(struct device *dev, struct device_attribute *attr, co
 				if (err !=1){
 					printk("[AURA_POGO] ene_6k582_write_bytes:err %d\n", err);
 					mutex_unlock(&g_pdata->ene_mutex);
-					mode2_state=-1;
+					ene_mode2_state=-1;
 					return count;
 				}
 				err = ene_6k582_write_bytes(client, addr+2, rgb[i*3+1]);
 				if (err !=1){
 					printk("[AURA_POGO] ene_6k582_write_bytes:err %d\n", err);
 					mutex_unlock(&g_pdata->ene_mutex);
-					mode2_state=-1;
+					ene_mode2_state=-1;
 					return count;
 				}
 				err = ene_6k582_write_bytes(client, addr+4, rgb[i*3+2]);
 				if (err !=1){
 					printk("[AURA_POGO] ene_6k582_write_bytes:err %d\n", err);
 					mutex_unlock(&g_pdata->ene_mutex);
-					mode2_state=-1;
+					ene_mode2_state=-1;
 					return count;
 				}
 			}
@@ -1664,28 +1664,28 @@ static ssize_t mode2_store(struct device *dev, struct device_attribute *attr, co
 			if (err !=1){
 				printk("[AURA_POGO] ene_6k582_write_bytes:err %d\n", err);
 				mutex_unlock(&g_pdata->ene_mutex);
-				mode2_state=-1;
+				ene_mode2_state=-1;
 				return count;
 			}
 			err = ene_6k582_write_bytes(client, 0x840A, 0x01);
 			if (err !=1){
 				printk("[AURA_POGO] ene_6k582_write_bytes:err %d\n", err);
 				mutex_unlock(&g_pdata->ene_mutex);
-				mode2_state=-1;
+				ene_mode2_state=-1;
 				return count;
 			}
 			err = ene_6k582_write_bytes(client, 0x840B, 0x0);
 			if (err !=1){
 				printk("[AURA_POGO] ene_6k582_write_bytes:err %d\n", err);
 				mutex_unlock(&g_pdata->ene_mutex);
-				mode2_state=-1;
+				ene_mode2_state=-1;
 				return count;
 			}
 			err = ene_6k582_write_bytes(client, 0x8451, 0xE4);
 			if (err !=1){
 				printk("[AURA_POGO] ene_6k582_write_bytes:err %d\n", err);
 				mutex_unlock(&g_pdata->ene_mutex);
-				mode2_state=-1;
+				ene_mode2_state=-1;
 				return count;
 			}
 			mutex_unlock(&g_pdata->ene_mutex);
@@ -1694,7 +1694,7 @@ static ssize_t mode2_store(struct device *dev, struct device_attribute *attr, co
 		case 3:  //breath at the same time
 			if(ntokens!=2){
 				printk("[AURA_POGO] mode2_store,wrong input. ntokensis not 2\n");
-				mode2_state=-1;
+				ene_mode2_state=-1;
 				return count;
 			}
 			mutex_lock(&g_pdata->ene_mutex);
@@ -1705,21 +1705,21 @@ static ssize_t mode2_store(struct device *dev, struct device_attribute *attr, co
 				if (err !=1){
 					printk("[AURA_POGO] ene_6k582_write_bytes:err %d\n", err);
 					mutex_unlock(&g_pdata->ene_mutex);
-					mode2_state=-1;
+					ene_mode2_state=-1;
 					return count;
 				}
 				err = ene_6k582_write_bytes(client, addr+2, rgb[i*3+1]);
 				if (err !=1){
 					printk("[AURA_POGO] ene_6k582_write_bytes:err %d\n", err);
 					mutex_unlock(&g_pdata->ene_mutex);
-					mode2_state=-1;
+					ene_mode2_state=-1;
 					return count;
 				}
 				err = ene_6k582_write_bytes(client, addr+4, rgb[i*3+2]);
 				if (err !=1){
 					printk("[AURA_POGO] ene_6k582_write_bytes:err %d\n", err);
 					mutex_unlock(&g_pdata->ene_mutex);
-					mode2_state=-1;
+					ene_mode2_state=-1;
 					return count;
 				}
 			}
@@ -1727,28 +1727,28 @@ static ssize_t mode2_store(struct device *dev, struct device_attribute *attr, co
 			if (err !=1){
 				printk("[AURA_POGO] ene_6k582_write_bytes:err %d\n", err);
 				mutex_unlock(&g_pdata->ene_mutex);
-				mode2_state=-1;
+				ene_mode2_state=-1;
 				return count;
 			}
 			err = ene_6k582_write_bytes(client, 0x840A, 0x01);
 			if (err !=1){
 				printk("[AURA_POGO] ene_6k582_write_bytes:err %d\n", err);
 				mutex_unlock(&g_pdata->ene_mutex);
-				mode2_state=-1;
+				ene_mode2_state=-1;
 				return count;
 			}
 			err = ene_6k582_write_bytes(client, 0x840B, 0x0);
 			if (err !=1){
 				printk("[AURA_POGO] ene_6k582_write_bytes:err %d\n", err);
 				mutex_unlock(&g_pdata->ene_mutex);
-				mode2_state=-1;
+				ene_mode2_state=-1;
 				return count;
 			}
 			err = ene_6k582_write_bytes(client, 0x8451, 0xE4);
 			if (err !=1){
 				printk("[AURA_POGO] ene_6k582_write_bytes:err %d\n", err);
 				mutex_unlock(&g_pdata->ene_mutex);
-				mode2_state=-1;
+				ene_mode2_state=-1;
 				return count;
 			}
 			mutex_unlock(&g_pdata->ene_mutex);
@@ -1757,7 +1757,7 @@ static ssize_t mode2_store(struct device *dev, struct device_attribute *attr, co
 		case 4:  //breath diff
 			if(ntokens!=2){
 				printk("[AURA_POGO] mode2_store,wrong input. ntokensis not 2\n");
-				mode2_state=-1;
+				ene_mode2_state=-1;
 				return count;
 			}
 			mutex_lock(&g_pdata->ene_mutex);
@@ -1768,21 +1768,21 @@ static ssize_t mode2_store(struct device *dev, struct device_attribute *attr, co
 				if (err !=1){
 					printk("[AURA_POGO] ene_6k582_write_bytes:err %d\n", err);
 					mutex_unlock(&g_pdata->ene_mutex);
-					mode2_state=-1;
+					ene_mode2_state=-1;
 					return count;
 				}
 				err = ene_6k582_write_bytes(client, addr+2, rgb[i*3+1]);
 				if (err !=1){
 					printk("[AURA_POGO] ene_6k582_write_bytes:err %d\n", err);
 					mutex_unlock(&g_pdata->ene_mutex);
-					mode2_state=-1;
+					ene_mode2_state=-1;
 					return count;
 				}
 				err = ene_6k582_write_bytes(client, addr+4, rgb[i*3+2]);
 				if (err !=1){
 					printk("[AURA_POGO] ene_6k582_write_bytes:err %d\n", err);
 					mutex_unlock(&g_pdata->ene_mutex);
-					mode2_state=-1;
+					ene_mode2_state=-1;
 					return count;
 				}
 			}
@@ -1790,28 +1790,28 @@ static ssize_t mode2_store(struct device *dev, struct device_attribute *attr, co
 			if (err !=1){
 				printk("[AURA_POGO] ene_6k582_write_bytes:err %d\n", err);
 				mutex_unlock(&g_pdata->ene_mutex);
-				mode2_state=-1;
+				ene_mode2_state=-1;
 				return count;
 			}
 			err = ene_6k582_write_bytes(client, 0x840A, 0x01);
 			if (err !=1){
 				printk("[AURA_POGO] ene_6k582_write_bytes:err %d\n", err);
 				mutex_unlock(&g_pdata->ene_mutex);
-				mode2_state=-1;
+				ene_mode2_state=-1;
 				return count;
 			}
 			err = ene_6k582_write_bytes(client, 0x840B, 0x0);
 			if (err !=1){
 				printk("[AURA_POGO] ene_6k582_write_bytes:err %d\n", err);
 				mutex_unlock(&g_pdata->ene_mutex);
-				mode2_state=-1;
+				ene_mode2_state=-1;
 				return count;
 			}
 			err = ene_6k582_write_bytes(client, 0x8451, 0xE4);
 			if (err !=1){
 				printk("[AURA_POGO] ene_6k582_write_bytes:err %d\n", err);
 				mutex_unlock(&g_pdata->ene_mutex);
-				mode2_state=-1;
+				ene_mode2_state=-1;
 				return count;
 			}
 			mutex_unlock(&g_pdata->ene_mutex);
@@ -1820,7 +1820,7 @@ static ssize_t mode2_store(struct device *dev, struct device_attribute *attr, co
 		case 5: //breath one led
 			if(ntokens!=2){
 				printk("[AURA_POGO] mode2_store,wrong input. ntokensis not 2\n");
-				mode2_state=-1;
+				ene_mode2_state=-1;
 				return count;
 			}
 			mutex_lock(&g_pdata->ene_mutex);
@@ -1831,21 +1831,21 @@ static ssize_t mode2_store(struct device *dev, struct device_attribute *attr, co
 				if (err !=1){
 					printk("[AURA_POGO] ene_6k582_write_bytes:err %d\n", err);
 					mutex_unlock(&g_pdata->ene_mutex);
-					mode2_state=-1;
+					ene_mode2_state=-1;
 					return count;
 				}
 				err = ene_6k582_write_bytes(client, addr+2, rgb[i*3+1]);
 				if (err !=1){
 					printk("[AURA_POGO] ene_6k582_write_bytes:err %d\n", err);
 					mutex_unlock(&g_pdata->ene_mutex);
-					mode2_state=-1;
+					ene_mode2_state=-1;
 					return count;
 				}
 				err = ene_6k582_write_bytes(client, addr+4, rgb[i*3+2]);
 				if (err !=1){
 					printk("[AURA_POGO] ene_6k582_write_bytes:err %d\n", err);
 					mutex_unlock(&g_pdata->ene_mutex);
-					mode2_state=-1;
+					ene_mode2_state=-1;
 					return count;
 				}
 			}
@@ -1853,35 +1853,35 @@ static ssize_t mode2_store(struct device *dev, struct device_attribute *attr, co
 			if (err !=1){
 				printk("[AURA_POGO] ene_6k582_write_bytes:err %d\n", err);
 				mutex_unlock(&g_pdata->ene_mutex);
-				mode2_state=-1;
+				ene_mode2_state=-1;
 				return count;
 			}
 			err = ene_6k582_write_bytes(client, 0x8403, 0x00);
 			if (err !=1){
 				printk("[AURA_POGO] ene_6k582_write_bytes:err %d\n", err);
 				mutex_unlock(&g_pdata->ene_mutex);
-				mode2_state=-1;
+				ene_mode2_state=-1;
 				return count;
 			}
 			err = ene_6k582_write_bytes(client, 0x840A, 0x01);
 			if (err !=1){
 				printk("[AURA_POGO] ene_6k582_write_bytes:err %d\n", err);
 				mutex_unlock(&g_pdata->ene_mutex);
-				mode2_state=-1;
+				ene_mode2_state=-1;
 				return count;
 			}
 			err = ene_6k582_write_bytes(client, 0x840B, 0x0);
 			if (err !=1){
 				printk("[AURA_POGO] ene_6k582_write_bytes:err %d\n", err);
 				mutex_unlock(&g_pdata->ene_mutex);
-				mode2_state=-1;
+				ene_mode2_state=-1;
 				return count;
 			}
 			err = ene_6k582_write_bytes(client, 0x8451, 0xE4);
 			if (err !=1){
 				printk("[AURA_POGO] ene_6k582_write_bytes:err %d\n", err);
 				mutex_unlock(&g_pdata->ene_mutex);
-				mode2_state=-1;
+				ene_mode2_state=-1;
 				return count;
 			}
 			mutex_unlock(&g_pdata->ene_mutex);
@@ -1890,7 +1890,7 @@ static ssize_t mode2_store(struct device *dev, struct device_attribute *attr, co
 		case 6: //commet
 			if(ntokens!=2){
 				printk("[AURA_POGO] mode2_store,wrong input. ntokensis not 2\n");
-				mode2_state=-1;
+				ene_mode2_state=-1;
 				return count;
 			}
 			mutex_lock(&g_pdata->ene_mutex);
@@ -1901,21 +1901,21 @@ static ssize_t mode2_store(struct device *dev, struct device_attribute *attr, co
 				if (err !=1){
 					printk("[AURA_POGO] ene_6k582_write_bytes:err %d\n", err);
 					mutex_unlock(&g_pdata->ene_mutex);
-					mode2_state=-1;
+					ene_mode2_state=-1;
 					return count;
 				}
 				err = ene_6k582_write_bytes(client, addr+2, rgb[i*3+1]);
 				if (err !=1){
 					printk("[AURA_POGO] ene_6k582_write_bytes:err %d\n", err);
 					mutex_unlock(&g_pdata->ene_mutex);
-					mode2_state=-1;
+					ene_mode2_state=-1;
 					return count;
 				}
 				err = ene_6k582_write_bytes(client, addr+4, rgb[i*3+2]);
 				if (err !=1){
 					printk("[AURA_POGO] ene_6k582_write_bytes:err %d\n", err);
 					mutex_unlock(&g_pdata->ene_mutex);
-					mode2_state=-1;
+					ene_mode2_state=-1;
 					return count;
 				}
 			}
@@ -1923,28 +1923,28 @@ static ssize_t mode2_store(struct device *dev, struct device_attribute *attr, co
 			if (err !=1){
 				printk("[AURA_POGO] ene_6k582_write_bytes:err %d\n", err);
 				mutex_unlock(&g_pdata->ene_mutex);
-				mode2_state=-1;
+				ene_mode2_state=-1;
 				return count;
 			}
 			err = ene_6k582_write_bytes(client, 0x8402, 0xB); //SPEED -10ms/frame
 			if (err !=1){
 				printk("[AURA_POGO] ene_6k582_write_bytes:err %d\n", err);
 				mutex_unlock(&g_pdata->ene_mutex);
-				mode2_state=-1;
+				ene_mode2_state=-1;
 				return count;
 			}
 			err = ene_6k582_write_bytes(client, 0x8403, 0x0); //direction
 			if (err !=1){
 				printk("[AURA_POGO] ene_6k582_write_bytes:err %d\n", err);
 				mutex_unlock(&g_pdata->ene_mutex);
-				mode2_state=-1;
+				ene_mode2_state=-1;
 				return count;
 			}
 			err = ene_6k582_write_bytes(client, 0x8451, 0xE2);
 			if (err !=1){
 				printk("[AURA_POGO] ene_6k582_write_bytes:err %d\n", err);
 				mutex_unlock(&g_pdata->ene_mutex);
-				mode2_state=-1;
+				ene_mode2_state=-1;
 				return count;
 			}
 			mutex_unlock(&g_pdata->ene_mutex);
@@ -1953,7 +1953,7 @@ static ssize_t mode2_store(struct device *dev, struct device_attribute *attr, co
 		case 7: //flash and dash
 			if(ntokens!=2){
 				printk("[AURA_POGO] mode2_store,wrong input. ntokensis not 2\n");
-				mode2_state=-1;
+				ene_mode2_state=-1;
 				return count;
 			}
 			mutex_lock(&g_pdata->ene_mutex);
@@ -1964,21 +1964,21 @@ static ssize_t mode2_store(struct device *dev, struct device_attribute *attr, co
 				if (err !=1){
 					printk("[AURA_POGO] ene_6k582_write_bytes:err %d\n", err);
 					mutex_unlock(&g_pdata->ene_mutex);
-					mode2_state=-1;
+					ene_mode2_state=-1;
 					return count;
 				}
 				err = ene_6k582_write_bytes(client, addr+2, rgb[i*3+1]);
 				if (err !=1){
 					printk("[AURA_POGO] ene_6k582_write_bytes:err %d\n", err);
 					mutex_unlock(&g_pdata->ene_mutex);
-					mode2_state=-1;
+					ene_mode2_state=-1;
 					return count;
 				}
 				err = ene_6k582_write_bytes(client, addr+4, rgb[i*3+2]);
 				if (err !=1){
 					printk("[AURA_POGO] ene_6k582_write_bytes:err %d\n", err);
 					mutex_unlock(&g_pdata->ene_mutex);
-					mode2_state=-1;
+					ene_mode2_state=-1;
 					return count;
 				}
 			}
@@ -1986,28 +1986,28 @@ static ssize_t mode2_store(struct device *dev, struct device_attribute *attr, co
 			if (err !=1){
 				printk("[AURA_POGO] ene_6k582_write_bytes:err %d\n", err);
 				mutex_unlock(&g_pdata->ene_mutex);
-				mode2_state=-1;
+				ene_mode2_state=-1;
 				return count;
 			}
 			err = ene_6k582_write_bytes(client, 0x8402, 0xB); //SPEED -10ms/frame
 			if (err !=1){
 				printk("[AURA_POGO] ene_6k582_write_bytes:err %d\n", err);
 				mutex_unlock(&g_pdata->ene_mutex);
-				mode2_state=-1;
+				ene_mode2_state=-1;
 				return count;
 			}
 			err = ene_6k582_write_bytes(client, 0x8403, 0x0); //direction
 			if (err !=1){
 				printk("[AURA_POGO] ene_6k582_write_bytes:err %d\n", err);
 				mutex_unlock(&g_pdata->ene_mutex);
-				mode2_state=-1;
+				ene_mode2_state=-1;
 				return count;
 			}
 			err = ene_6k582_write_bytes(client, 0x8451, 0xE2);
 			if (err !=1){
 				printk("[AURA_POGO] ene_6k582_write_bytes:err %d\n", err);
 				mutex_unlock(&g_pdata->ene_mutex);
-				mode2_state=-1;
+				ene_mode2_state=-1;
 				return count;
 			}
 			mutex_unlock(&g_pdata->ene_mutex);
@@ -2016,7 +2016,7 @@ static ssize_t mode2_store(struct device *dev, struct device_attribute *attr, co
 		case 8: //commet in different direction
 			if(ntokens!=2){
 				printk("[AURA_POGO] mode2_store,wrong input. ntokensis not 2\n");
-				mode2_state=-1;
+				ene_mode2_state=-1;
 				return count;
 			}
 			mutex_lock(&g_pdata->ene_mutex);
@@ -2027,21 +2027,21 @@ static ssize_t mode2_store(struct device *dev, struct device_attribute *attr, co
 				if (err !=1){
 					printk("[AURA_POGO] ene_6k582_write_bytes:err %d\n", err);
 					mutex_unlock(&g_pdata->ene_mutex);
-					mode2_state=-1;
+					ene_mode2_state=-1;
 					return count;
 				}
 				err = ene_6k582_write_bytes(client, addr+2, rgb[i*3+1]);
 				if (err !=1){
 					printk("[AURA_POGO] ene_6k582_write_bytes:err %d\n", err);
 					mutex_unlock(&g_pdata->ene_mutex);
-					mode2_state=-1;
+					ene_mode2_state=-1;
 					return count;
 				}
 				err = ene_6k582_write_bytes(client, addr+4, rgb[i*3+2]);
 				if (err !=1){
 					printk("[AURA_POGO] ene_6k582_write_bytes:err %d\n", err);
 					mutex_unlock(&g_pdata->ene_mutex);
-					mode2_state=-1;
+					ene_mode2_state=-1;
 					return count;
 				}
 			}
@@ -2049,28 +2049,28 @@ static ssize_t mode2_store(struct device *dev, struct device_attribute *attr, co
 			if (err !=1){
 				printk("[AURA_POGO] ene_6k582_write_bytes:err %d\n", err);
 				mutex_unlock(&g_pdata->ene_mutex);
-				mode2_state=-1;
+				ene_mode2_state=-1;
 				return count;
 			}
 			err = ene_6k582_write_bytes(client, 0x8402, 0xB); //SPEED -10ms/frame
 			if (err !=1){
 				printk("[AURA_POGO] ene_6k582_write_bytes:err %d\n", err);
 				mutex_unlock(&g_pdata->ene_mutex);
-				mode2_state=-1;
+				ene_mode2_state=-1;
 				return count;
 			}
 			err = ene_6k582_write_bytes(client, 0x8403, 0x1); //direction
 			if (err !=1){
 				printk("[AURA_POGO] ene_6k582_write_bytes:err %d\n", err);
 				mutex_unlock(&g_pdata->ene_mutex);
-				mode2_state=-1;
+				ene_mode2_state=-1;
 				return count;
 			}
 			err = ene_6k582_write_bytes(client, 0x8451, 0xE2);
 			if (err !=1){
 				printk("[AURA_POGO] ene_6k582_write_bytes:err %d\n", err);
 				mutex_unlock(&g_pdata->ene_mutex);
-				mode2_state=-1;
+				ene_mode2_state=-1;
 				return count;
 			}
 			mutex_unlock(&g_pdata->ene_mutex);
@@ -2079,7 +2079,7 @@ static ssize_t mode2_store(struct device *dev, struct device_attribute *attr, co
 		case 9: //flash and dash in the different direction
 			if(ntokens!=2){
 				printk("[AURA_POGO] mode2_store,wrong input. ntokensis not 2\n");
-				mode2_state=-1;
+				ene_mode2_state=-1;
 				return count;
 			}
 			mutex_lock(&g_pdata->ene_mutex);
@@ -2090,21 +2090,21 @@ static ssize_t mode2_store(struct device *dev, struct device_attribute *attr, co
 				if (err !=1){
 					printk("[AURA_POGO] ene_6k582_write_bytes:err %d\n", err);
 					mutex_unlock(&g_pdata->ene_mutex);
-					mode2_state=-1;
+					ene_mode2_state=-1;
 					return count;
 				}
 				err = ene_6k582_write_bytes(client, addr+2, rgb[i*3+1]);
 				if (err !=1){
 					printk("[AURA_POGO] ene_6k582_write_bytes:err %d\n", err);
 					mutex_unlock(&g_pdata->ene_mutex);
-					mode2_state=-1;
+					ene_mode2_state=-1;
 					return count;
 				}
 				err = ene_6k582_write_bytes(client, addr+4, rgb[i*3+2]);
 				if (err !=1){
 					printk("[AURA_POGO] ene_6k582_write_bytes:err %d\n", err);
 					mutex_unlock(&g_pdata->ene_mutex);
-					mode2_state=-1;
+					ene_mode2_state=-1;
 					return count;
 				}
 			}
@@ -2112,28 +2112,28 @@ static ssize_t mode2_store(struct device *dev, struct device_attribute *attr, co
 			if (err !=1){
 				printk("[AURA_POGO] ene_6k582_write_bytes:err %d\n", err);
 				mutex_unlock(&g_pdata->ene_mutex);
-				mode2_state=-1;
+				ene_mode2_state=-1;
 				return count;
 			}
 			err = ene_6k582_write_bytes(client, 0x8402, 0xB); //SPEED -10ms/frame
 			if (err !=1){
 				printk("[AURA_POGO] ene_6k582_write_bytes:err %d\n", err);
 				mutex_unlock(&g_pdata->ene_mutex);
-				mode2_state=-1;
+				ene_mode2_state=-1;
 				return count;
 			}
 			err = ene_6k582_write_bytes(client, 0x8403, 0x1); //direction
 			if (err !=1){
 				printk("[AURA_POGO] ene_6k582_write_bytes:err %d\n", err);
 				mutex_unlock(&g_pdata->ene_mutex);
-				mode2_state=-1;
+				ene_mode2_state=-1;
 				return count;
 			}
 			err = ene_6k582_write_bytes(client, 0x8451, 0xE2);
 			if (err !=1){
 				printk("[AURA_POGO] ene_6k582_write_bytes:err %d\n", err);
 				mutex_unlock(&g_pdata->ene_mutex);
-				mode2_state=-1;
+				ene_mode2_state=-1;
 				return count;
 			}
 			mutex_unlock(&g_pdata->ene_mutex);
@@ -2142,7 +2142,7 @@ static ssize_t mode2_store(struct device *dev, struct device_attribute *attr, co
 	 	case 10:
 	 		if(ntokens!=6){
 				printk("[AURA_POGO] mode2_store,wrong input. ntokensis not 6\n");
-				mode2_state=-1;
+				ene_mode2_state=-1;
 				return count;
 			}
 			//printk("[AURA_POGO] mode2: 0x%x - 6 colors rainbow \n",  mode2);
@@ -2153,21 +2153,21 @@ static ssize_t mode2_store(struct device *dev, struct device_attribute *attr, co
 				if (err !=1){
 					printk("[AURA_POGO] ene_6k582_write_bytes:err %d\n", err);
 					mutex_unlock(&g_pdata->ene_mutex);
-					mode2_state=-1;
+					ene_mode2_state=-1;
 					return count;
 				}
 				err = ene_6k582_write_bytes(client, addr+0x10, rgb[i*3+1]);
 				if (err !=1){
 					printk("[AURA_POGO] ene_6k582_write_bytes:err %d\n", err);
 					mutex_unlock(&g_pdata->ene_mutex);
-					mode2_state=-1;
+					ene_mode2_state=-1;
 					return count;
 				}
 				err = ene_6k582_write_bytes(client, addr+0x20, rgb[i*3+2]);
 				if (err !=1){
 					printk("[AURA_POGO] ene_6k582_write_bytes:err %d\n", err);
 					mutex_unlock(&g_pdata->ene_mutex);
-					mode2_state=-1;
+					ene_mode2_state=-1;
 					return count;
 				}
 			}
@@ -2175,28 +2175,28 @@ static ssize_t mode2_store(struct device *dev, struct device_attribute *attr, co
 			if (err !=1){
 				printk("[AURA_POGO] ene_6k582_write_bytes:err %d\n", err);
 				mutex_unlock(&g_pdata->ene_mutex);
-				mode2_state=-1;
+				ene_mode2_state=-1;
 				return count;
 			}
 			err = ene_6k582_write_bytes(client, 0x820F, 0xE1);
 			if (err !=1){
 				printk("[AURA_POGO] ene_6k582_write_bytes:err %d\n", err);
 				mutex_unlock(&g_pdata->ene_mutex);
-				mode2_state=-1;
+				ene_mode2_state=-1;
 				return count;
 			}
 			err = ene_6k582_write_bytes(client, 0x8401, 0x03);
 			if (err !=1){
 				printk("[AURA_POGO] ene_6k582_write_bytes:err %d\n", err);
 				mutex_unlock(&g_pdata->ene_mutex);
-				mode2_state=-1;
+				ene_mode2_state=-1;
 				return count;
 			}
 			err = ene_6k582_write_bytes(client, 0x8451, 0xE1);
 			if (err !=1){
 				printk("[AURA_POGO] ene_6k582_write_bytes:err %d\n", err);
 				mutex_unlock(&g_pdata->ene_mutex);
-				mode2_state=-1;
+				ene_mode2_state=-1;
 				return count;
 			}
 			mutex_unlock(&g_pdata->ene_mutex);
@@ -2205,7 +2205,7 @@ static ssize_t mode2_store(struct device *dev, struct device_attribute *attr, co
 		case 11: //breath one led
 			if(ntokens!=2){
 				printk("[AURA_POGO] mode2_store,wrong input. ntokensis not 2\n");
-				mode2_state=-1;
+				ene_mode2_state=-1;
 				return count;
 			}
 			mutex_lock(&g_pdata->ene_mutex);
@@ -2216,21 +2216,21 @@ static ssize_t mode2_store(struct device *dev, struct device_attribute *attr, co
 				if (err !=1){
 					printk("[AURA_POGO] ene_6k582_write_bytes:err %d\n", err);
 					mutex_unlock(&g_pdata->ene_mutex);
-					mode2_state=-1;
+					ene_mode2_state=-1;
 					return count;
 				}
 				err = ene_6k582_write_bytes(client, addr+2, rgb[i*3+1]);
 				if (err !=1){
 					printk("[AURA_POGO] ene_6k582_write_bytes:err %d\n", err);
 					mutex_unlock(&g_pdata->ene_mutex);
-					mode2_state=-1;
+					ene_mode2_state=-1;
 					return count;
 				}
 				err = ene_6k582_write_bytes(client, addr+4, rgb[i*3+2]);
 				if (err !=1){
 					printk("[AURA_POGO] ene_6k582_write_bytes:err %d\n", err);
 					mutex_unlock(&g_pdata->ene_mutex);
-					mode2_state=-1;
+					ene_mode2_state=-1;
 					return count;
 				}
 			}
@@ -2238,35 +2238,35 @@ static ssize_t mode2_store(struct device *dev, struct device_attribute *attr, co
 			if (err !=1){
 				printk("[AURA_POGO] ene_6k582_write_bytes:err %d\n", err);
 				mutex_unlock(&g_pdata->ene_mutex);
-				mode2_state=-1;
+				ene_mode2_state=-1;
 				return count;
 			}
 			err = ene_6k582_write_bytes(client, 0x8403, 0x01);
 			if (err !=1){
 				printk("[AURA_POGO] ene_6k582_write_bytes:err %d\n", err);
 				mutex_unlock(&g_pdata->ene_mutex);
-				mode2_state=-1;
+				ene_mode2_state=-1;
 				return count;
 			}
 			err = ene_6k582_write_bytes(client, 0x840A, 0x01);
 			if (err !=1){
 				printk("[AURA_POGO] ene_6k582_write_bytes:err %d\n", err);
 				mutex_unlock(&g_pdata->ene_mutex);
-				mode2_state=-1;
+				ene_mode2_state=-1;
 				return count;
 			}
 			err = ene_6k582_write_bytes(client, 0x840B, 0x0);
 			if (err !=1){
 				printk("[AURA_POGO] ene_6k582_write_bytes:err %d\n", err);
 				mutex_unlock(&g_pdata->ene_mutex);
-				mode2_state=-1;
+				ene_mode2_state=-1;
 				return count;
 			}
 			err = ene_6k582_write_bytes(client, 0x8451, 0xE4);
 			if (err !=1){
 				printk("[AURA_POGO] ene_6k582_write_bytes:err %d\n", err);
 				mutex_unlock(&g_pdata->ene_mutex);
-				mode2_state=-1;
+				ene_mode2_state=-1;
 				return count;
 			}
 			mutex_unlock(&g_pdata->ene_mutex);
@@ -2283,7 +2283,7 @@ static ssize_t mode2_store(struct device *dev, struct device_attribute *attr, co
 static ssize_t mode2_show(struct device *dev, struct device_attribute *attr,char *buf)
 {
 
-	return snprintf(buf, PAGE_SIZE,"%d\n",mode2_state);
+	return snprintf(buf, PAGE_SIZE,"%d\n",ene_mode2_state);
 }
 
 
