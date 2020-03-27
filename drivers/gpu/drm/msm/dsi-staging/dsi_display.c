@@ -1164,7 +1164,7 @@ int dsi_display_set_power(struct drm_connector *connector,
 		} else {
 			if (!g_enter_AOD) {
 				pr_err("[Display] enter AOD.\n");
-				rc = dsi_panel_set_lp1(display->panel);
+				rc = dsi_panel_set_nolp(display->panel);
 				set_panel_aod_bl();
 				dsi_panel_set_backlight(display->panel, g_alpm_bl);
 				g_enter_AOD = true;
