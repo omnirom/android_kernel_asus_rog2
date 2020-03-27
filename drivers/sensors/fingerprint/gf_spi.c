@@ -126,10 +126,10 @@ static void FOD_AUTH(struct work_struct *work) {
         printk("[JK][SPI] reinit_completion\n");
     }
 
-    if (!wait_for_completion_timeout(&fod_fbc_comp, HZ * 0.3)) {
+    /*if (!wait_for_completion_timeout(&fod_fbc_comp, HZ * 0.3)) {
         printk("[JK][FOD_ERR] wait_for_completion_timeout\n");
         return;
-    }
+    }*/
 
     spin_lock(&gf_dev->timer_lock);
     if (gf_dev->timer_init && atomic_read(&g_notify_fod) && atomic_read(&g_fg_down)) {
@@ -261,7 +261,7 @@ void TP_call_FOD(int id, bool down){
             set_fod_ir_drop(false);
             if (g_panel_power_state_idle)
                 set_panel_idle(false);
-            schedule_delayed_work(&gf_dev->FOD_Auth_work, msecs_to_jiffies(110));
+            schedule_delayed_work(&gf_dev->FOD_Auth_work, msecs_to_jiffies(3));
 //            init_FOD_Timer(gf_dev,110);
             gf_dev->timer_init=true;
             //reinit_completion(&fod_fbc_comp);
