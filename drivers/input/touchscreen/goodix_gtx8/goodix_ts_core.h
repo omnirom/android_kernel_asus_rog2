@@ -563,6 +563,12 @@ struct gesture_module {
 	//ASUS_BSP Beryl +++
 	u8 zenmotion_type;
 	atomic_t dclick;
+	atomic_t gesture_c;
+	atomic_t gesture_e;
+	atomic_t gesture_s;
+	atomic_t gesture_v;
+	atomic_t gesture_w;
+	atomic_t gesture_z;
 	atomic_t swipeup;
 	atomic_t aod_enable;
 	int rotation;
