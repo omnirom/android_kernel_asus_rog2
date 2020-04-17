@@ -740,16 +740,17 @@ static ssize_t hw_id_show(struct device *dev,
 					 char *buf)
 {
 	int ret = 0;
-	char buffer[2] = {0};
+	char buffer[3] = {0};
 	char cmd = 0;
 
 	cmd = CMD_I2C_GET_HW_ID;
 	
-	ret = ec_i2c_read(ec_i2c_data->client,&cmd,1,buffer,2);
+	ret = ec_i2c_read(ec_i2c_data->client,&cmd,1,buffer,3);
 	if (ret < 0)
 		return sprintf(buf, "%s\n", "I2C not connect");
 
-	return snprintf(buf, PAGE_SIZE,"%d\n", buffer[1]);
+	printk("[EC_I2C] hw_id_show : 0x%x, 0x%x\n", buffer[1],buffer[2]);
+	return snprintf(buf, PAGE_SIZE,"%x%x\n", buffer[1],buffer[2]);
 }
 
 static ssize_t ec_ssn_show(struct device *dev,

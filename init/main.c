@@ -279,6 +279,8 @@ EXPORT_SYMBOL(g_lcd_stage);
 //+++ ASUS_BSP : Add for COUNTRY
 bool g_Country_RU = false;
 bool g_Country_EU = false;
+bool g_Country_CN = false;
+
 static int get_country_code(char *str)
 {
 
@@ -286,6 +288,8 @@ static int get_country_code(char *str)
         g_Country_RU = true;
     else if ( strcmp("EU", str) == 0 )
         g_Country_EU = true;
+    else if ( strcmp("CN", str) == 0 )
+        g_Country_CN = true;
 
 	printk("androidboot.country_code=%s\n", str);
     return 0;
@@ -293,6 +297,7 @@ static int get_country_code(char *str)
 __setup("androidboot.country_code=", get_country_code);
 EXPORT_SYMBOL(g_Country_RU);
 EXPORT_SYMBOL(g_Country_EU);
+EXPORT_SYMBOL(g_Country_CN);
 //--- ASUS_BSP : Add for COUNTRY
 
 //+++ ASUS_BSP : miniporting

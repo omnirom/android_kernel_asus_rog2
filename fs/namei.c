@@ -124,6 +124,7 @@
 
 extern bool g_Country_RU;
 extern bool g_Country_EU;
+extern bool g_Country_CN;
 
 #define EMBEDDED_NAME_MAX	(PATH_MAX - offsetof(struct filename, iname))
 
@@ -165,8 +166,12 @@ getname_flags(const char __user *filename, int flags, int *empty)
 			//printk("%s: load build.prop from build_ru.prop",__func__);
 			strncpy(kname, "/vendor/build_ru.prop", EMBEDDED_NAME_MAX);
 			len = 21;
-		}
-    }
+		}else if(g_Country_CN){
+                        //printk("%s: load build.prop from build_cn.prop",__func__);
+                        strncpy(kname, "/vendor/build_cn.prop", EMBEDDED_NAME_MAX);
+                        len = 21;
+                }
+    	}
 
 	/*
 	 * Uh-oh. We have a name that's approaching PATH_MAX. Allocate a

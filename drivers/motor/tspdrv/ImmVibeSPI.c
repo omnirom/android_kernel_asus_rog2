@@ -157,7 +157,8 @@
 #define DEFAULT_BOT_VD_CLAMP	3500 //3.5V, gamma
 #endif
 #define MAX_TOP_VD_CLAMP	5000 //5.0V, 0832
-#define MAX_BOT_VD_CLAMP	8000 //8.5V, gamma
+#define MAX_BOT_VD_CLAMP	7000 //7.0V, gamma
+//#define MAX_BOT_VD_CLAMP	8000 //8.0V, gamma
 //#define MAX_BOT_VD_CLAMP	9000 //9.0V, gamma
 
 struct dw791x_priv {
@@ -174,9 +175,11 @@ struct dw791x_priv {
 	int lp_trigger_effect;
 //leds end
 //common
-	struct work_struct work;
-	struct mutex dev_lock;
-	struct hrtimer timer;
+    //AOSP vibration +++
+	struct work_struct vibrator_work; //AOSP vibration work
+	struct mutex dev_lock;//AOSP vibration lock
+	struct hrtimer timer; //AOSP vibration timer 
+    //AOSP vibration ---
 //common end
 	char dev_name[8];
 	u8 rtp_input;
@@ -229,6 +232,8 @@ struct dw791x_priv {
 //end
 	//i2c status
 	bool i2c_status;
+    int i2c_fail_count;
+    int i2c_debug;
 	//
 	//rtp mode play control
 	volatile bool bRTP_Play_Break;
@@ -286,6 +291,7 @@ static bool gVibIF=false;
  * 0x0008: nForce data
  * 0x0010: store node debug
  * 0x0020: vibratorcontrol debug
+ * 0x0040: i2c debug
  * 0x0100: open vd_clamp limitation
  */
 static int gVibDebugLog=0;
@@ -372,6 +378,90 @@ IMMVIBESPIAPI VibeStatus ImmVibeSPI_ForceOut_SetSamples(VibeUInt8 nActuatorIndex
 static int dw791x_probe(struct i2c_client* client, const struct i2c_device_id* id);
 static void dw791x_shutdown(struct i2c_client* client);
 static int dw791x_remove(struct i2c_client* client);
+
+//check i2c status +++
+static int dw791x_i2c_status(struct dw791x_priv *dw791x){
+        if(dw791x==NULL) return 0;
+        if (2 != i2c_recv_buf(dw791x->i2c, DW791x_PID, &dw791x->chipid, 1)) {
+            DbgOut((DBL_ERROR, "%s: i2c bus failed!!!\n", __func__));
+            dw791x->i2c_status=0;
+            dw791x->i2c_fail_count++;
+            return 0;
+        }
+        else
+            return 1;
+}
+//check i2c status ---
+//AOSP vibration +++
+static int dw791x_haptic_stop(struct dw791x_priv *dw791x)
+{
+    pr_debug("%s enter\n", __func__);
+    //stop playing
+    dw791x->bRTP_Play_Break=true;
+    if(dw791x->bRTP_Play_Break)
+    {
+        if(gVibDebugLog&0x0010)//store node debug
+            DbgOut((DBL_ERROR, "%s:break=%d, cancel_work_sync!\n", __func__, dw791x->bRTP_Play_Break));
+        cancel_work_sync(&dw791x->rtp_work);
+        if(dw791x->fw!=NULL){
+            if(gVibDebugLog&0x0010)//check break status
+                DbgOut((DBL_INFO, "%s:fw_name= %s, call release_firmware()...\n",__func__, dw791x->fwName));
+            release_firmware(dw791x->fw);
+            dw791x->fw=NULL;
+        }
+        dw791x->bRTP_Play_Break=false;
+        if(gVibDebugLog&0x0010)//store node debug
+            DbgOut((DBL_ERROR, "%s:break=%d, cancel_work_sync!\n", __func__, dw791x->bRTP_Play_Break));
+    }
+    //end
+	dw791x_byte_write(dw791x->i2c, dw791x->play_back, DRV_STOP);
+	dw7914_mode_set(dw791x->i2c, D14_FIFO_FLUSH, BITSET);
+    return 0;
+}
+
+static enum hrtimer_restart dw791x_vibrator_timer_func(struct hrtimer *timer)
+{
+    struct dw791x_priv *dw791x = container_of(timer, struct dw791x_priv, timer);
+
+    if(gVibDebugLog&0x0010)//store node debug
+        DbgOut((DBL_ERROR, "%s:+++\n", __func__));
+    dw791x->state = 0;
+    if(gVibDebugLog&0x0010)//store node debug
+        DbgOut((DBL_ERROR, "%s:schedule_work:dw791x_vibrator_work_routine\n", __func__));
+    schedule_work(&dw791x->vibrator_work);
+    if(gVibDebugLog&0x0010)//store node debug
+        DbgOut((DBL_ERROR, "%s:---\n", __func__));
+
+    return HRTIMER_NORESTART;
+}
+
+static void dw791x_vibrator_work_routine(struct work_struct *work)
+{
+    struct dw791x_priv *dw791x = container_of(work, struct dw791x_priv, vibrator_work);
+    unsigned val = 0;
+    
+    if(gVibDebugLog&0x0010)//store node debug
+        DbgOut((DBL_ERROR, "%s:+++\n", __func__));
+    mutex_lock(&dw791x->dev_lock);
+    dw791x_haptic_stop(dw791x);
+    if(dw791x->state) {
+        val = dw791x->duration;
+        if(val>0){
+            //play vibration
+            dw791x_byte_write(dw791x->i2c, dw791x->play_back, DRV_PLAY);
+            //end play
+            /* run ms timer */
+            if(gVibDebugLog&0x0010)//store node debug
+                DbgOut((DBL_ERROR, "%s:hrtimer_start:dw791x_vibrator_timer_func, %dms\n", __func__, val));
+            hrtimer_start(&dw791x->timer,
+                      ktime_set(val / 1000, (val % 1000) * 1000000),
+                      HRTIMER_MODE_REL);
+        }
+    }
+    mutex_unlock(&dw791x->dev_lock);
+    if(gVibDebugLog&0x0010)//store node debug
+        DbgOut((DBL_ERROR, "%s:---\n", __func__));
+}//AOSP vibration ---
 
 /*
 ** DW791x Register Dump Functions
@@ -492,7 +582,8 @@ void dw7914_enable_trigger2(int channel, bool enable){
 		dw791x=dw791x_devs[1];
 		#endif
 		if(!dw791x->i2c_status){
-			DbgOut((DBL_ERROR, "%s: vibrator %d i2c fail\n", __func__, getActuatorIndex(dw791x->i2c)));
+            if(dw791x->i2c_fail_count<6)
+                DbgOut((DBL_ERROR, "%s: vibrator %d i2c fail\n", __func__, getActuatorIndex(dw791x->i2c)));
 		}
 		else{
 			DbgOut((DBL_INFO, "%s:gamma trigger2:%s, level=%d\n", __func__, enable ? "enable":"disable", dw791x->trigger_tap_level));
@@ -525,7 +616,8 @@ void dw7914_enable_trigger2(int channel, bool enable){
 		dw791x=dw791x_devs[0];
 		#endif
 		if(!dw791x->i2c_status){
-			DbgOut((DBL_ERROR, "%s: vibrator %d i2c fail\n", __func__, getActuatorIndex(dw791x->i2c)));
+            if(dw791x->i2c_fail_count<6)
+                DbgOut((DBL_ERROR, "%s: vibrator %d i2c fail\n", __func__, getActuatorIndex(dw791x->i2c)));
 		}
 		else{
 			DbgOut((DBL_INFO, "%s:0832 trigger2:%s, level=%d\n", __func__, enable ? "enable":"disable", dw791x->trigger_slider_level));
@@ -667,7 +759,8 @@ int dw791x_play_mode_sel(struct i2c_client* client, int play_mode, u32 set1, u32
 
     DbgOut((DBL_INFO, "%s: %s:%d\n, %d, %d, %d", __func__, (getActuatorIndex(client)==0)?"Bot":"Top",play_mode, set1, set2, set3));
     if(!dw791x->i2c_status){
-		DbgOut((DBL_ERROR, "%s: %d , vibrator %d i2c fail\n", __func__, play_mode, getActuatorIndex(client)));
+        if(dw791x->i2c_fail_count<6)
+            DbgOut((DBL_ERROR, "%s: %d , vibrator %d i2c fail\n", __func__, play_mode, getActuatorIndex(client)));
 		return -1;
 	}
 	dw791x_byte_write(client, DW7914_PWM, gPWM);//48Khz
@@ -1315,7 +1408,8 @@ static int dw791x_vibrator_control(struct i2c_client* client, int fun, int param
 
 	DbgOut((DBL_INFO, "%s:fun=0x%04x, param=0x%04x\n", __func__, fun, param));
     if(!dw791x->i2c_status){
-		DbgOut((DBL_ERROR, "%s:0x%04x:0x%04x, vibrator %d i2c fail\n", __func__, fun, param, getActuatorIndex(client)));
+        if(dw791x->i2c_fail_count<6)
+            DbgOut((DBL_ERROR, "%s:0x%04x:0x%04x, vibrator %d i2c fail\n", __func__, fun, param, getActuatorIndex(client)));
 		return -1;
 	}
 	switch(fun) {
@@ -1599,7 +1693,8 @@ static void top_vib_irq_rtp_work(struct work_struct *work)
 	u8 rx[2];
 
     if(!dw791x->i2c_status){
-		DbgOut((DBL_ERROR, "%s: vibrator %d i2c fail\n", __func__, getActuatorIndex(dw791x->i2c)));
+        if(dw791x->i2c_fail_count<6)
+            DbgOut((DBL_ERROR, "%s: vibrator %d i2c fail\n", __func__, getActuatorIndex(dw791x->i2c)));
 	}	
 	else{
 		rx[0] = dw791x_byte_read(dw791x->i2c, DW7914_STATUS0);
@@ -1641,7 +1736,8 @@ static void bot_vib_irq_rtp_work(struct work_struct *work)
 	u8 rx[2];
 	
     if(!dw791x->i2c_status){
-		DbgOut((DBL_ERROR, "%s: vibrator %d i2c fail\n", __func__, getActuatorIndex(dw791x->i2c)));
+        if(dw791x->i2c_fail_count<6)
+            DbgOut((DBL_ERROR, "%s: vibrator %d i2c fail\n", __func__, getActuatorIndex(dw791x->i2c)));
 	}	
 	else{
 		rx[0] = dw791x_byte_read(dw791x->i2c, DW7914_STATUS0);
@@ -1876,7 +1972,7 @@ static ssize_t enableVIB_show(struct device *dev, struct device_attribute *attr,
 	int ret=0;
 	
     if(!dw791x->i2c_status){
-		return snprintf(buf, PAGE_SIZE, "%s: vibrator %d i2c fail\n", __func__, getActuatorIndex(dw791x->i2c));;
+        return snprintf(buf, PAGE_SIZE, "%s: vibrator %d i2c fail\n", __func__, getActuatorIndex(dw791x->i2c));;
 	}
 	ret = dw791x_byte_read(dw791x->i2c, DW791x_PID);
 	DbgOut((DBL_INFO, "product id : %x\n", ret));
@@ -1914,7 +2010,7 @@ static ssize_t enableVIB_0832_show(struct device *dev, struct device_attribute *
 	int ret=0;
 
     if(!dw791x->i2c_status){
-		return snprintf(buf, PAGE_SIZE, "%s: vibrator %d i2c fail\n", __func__, getActuatorIndex(dw791x->i2c));;
+        return snprintf(buf, PAGE_SIZE, "%s: vibrator %d i2c fail\n", __func__, getActuatorIndex(dw791x->i2c));;
 	}
 	ret = dw791x_byte_read(dw791x->i2c, DW791x_PID);
 	DbgOut((DBL_INFO, "product id : %x\n", ret));
@@ -1979,7 +2075,7 @@ static ssize_t top_vib_control_show(struct device *dev, struct device_attribute 
 	int ret=0;
 	
     if(!dw791x->i2c_status){
-		return snprintf(buf, PAGE_SIZE, "%s: vibrator %d i2c fail\n", __func__, getActuatorIndex(dw791x->i2c));;
+        return snprintf(buf, PAGE_SIZE, "%s: vibrator %d i2c fail\n", __func__, getActuatorIndex(dw791x->i2c));;
 	}
 	ret = dw791x_byte_read(dw791x->i2c, DW791x_PID);
 	DbgOut((DBL_INFO, "product id : %x\n", ret));
@@ -2016,7 +2112,7 @@ static ssize_t bot_vib_control_show(struct device *dev, struct device_attribute 
 	int ret=0;
 
     if(!dw791x->i2c_status){
-		return snprintf(buf, PAGE_SIZE, "%s: vibrator %d i2c fail\n", __func__, getActuatorIndex(dw791x->i2c));;
+        return snprintf(buf, PAGE_SIZE, "%s: vibrator %d i2c fail\n", __func__, getActuatorIndex(dw791x->i2c));;
 	}
 	ret = dw791x_byte_read(dw791x->i2c, DW791x_PID);
 	DbgOut((DBL_INFO, "product id : %x\n", ret));
@@ -2217,6 +2313,23 @@ static ssize_t debuglog_store(struct device *dev,
 		gVibDebugLog=val;
 	else
 		gVibDebugLog=0;
+    if(val==0x40) //i2c debug
+    {
+        //set i2c all failure to debug
+        dw791x_devs[0]->i2c_status=0;
+        dw791x_devs[0]->i2c_debug=1;
+        dw791x_devs[1]->i2c_status=0;
+        dw791x_devs[1]->i2c_debug=1;
+        DbgOut((DBL_INFO, "%s:set i2c_status fail to debug\n", __func__));
+    }
+    else if((val&0x40)==0)//disable i2c debug
+    {
+        dw791x_devs[0]->i2c_status=dw791x_i2c_status(dw791x_devs[0]);
+        dw791x_devs[0]->i2c_debug=0;
+        dw791x_devs[1]->i2c_status=dw791x_i2c_status(dw791x_devs[1]);
+        dw791x_devs[1]->i2c_debug=0;
+        DbgOut((DBL_INFO, "%s:disable i2c debug\n", __func__));
+    }
 	printk("%s:gVibDebugLog=%d\n", __func__,gVibDebugLog);
 	return count;
 }
@@ -2243,6 +2356,11 @@ static ssize_t vib_enable_store(struct device *dev,
 	int index=0;
     struct dw791x_priv *dw791x=NULL;
     
+    if(!dw791x->i2c_status){
+        if(dw791x->i2c_fail_count<6)
+            DbgOut((DBL_ERROR, "%s: vibrator %d i2c fail\n", __func__, getActuatorIndex(dw791x->i2c)));
+		return count;
+	}
 	if(!buf) return -1;
 	if(gChannel>=3) index=0;
 	else index=gChannel-1;
@@ -2287,7 +2405,8 @@ static ssize_t pwm_store(struct device *dev,
 	if(index<0) index=0;
     dw791x=dw791x_devs[index];
     if(!dw791x->i2c_status){
-		DbgOut((DBL_ERROR, "%s: vibrator %d i2c fail\n", __func__, getActuatorIndex(dw791x->i2c)));
+        if(dw791x->i2c_fail_count<6)
+            DbgOut((DBL_ERROR, "%s: vibrator %d i2c fail\n", __func__, getActuatorIndex(dw791x->i2c)));
 		return count;
 	}
     
@@ -2315,7 +2434,7 @@ static ssize_t status_reg_show(struct device *dev, struct device_attribute *attr
     dw791x=dw791x_devs[1];
     #endif
     if(!dw791x->i2c_status){
-		return snprintf(buf, PAGE_SIZE, "%s: vibrator %d i2c fail\n", __func__, getActuatorIndex(dw791x->i2c));
+        return snprintf(buf, PAGE_SIZE, "%s: vibrator %d i2c fail\n", __func__, getActuatorIndex(dw791x->i2c));
 	}
 	rx[0] = dw791x_byte_read(dw791x->i2c, DW7914_STATUS0);
 	rx[1] = dw791x_byte_read(dw791x->i2c, DW7914_STATUS1);
@@ -2377,7 +2496,8 @@ static ssize_t register_store(struct device *dev,
 	if(index<0) index=0;
     dw791x=dw791x_devs[index];  
     if(!dw791x->i2c_status){
-		DbgOut((DBL_ERROR, "%s: vibrator %d i2c fail\n", __func__, getActuatorIndex(dw791x->i2c)));
+        if(dw791x->i2c_fail_count<6)
+            DbgOut((DBL_ERROR, "%s: vibrator %d i2c fail\n", __func__, getActuatorIndex(dw791x->i2c)));
 		return count;
 	}
 	sscanf(buf, "%d 0x%2x %d", &rw, &addr, &value);
@@ -2416,7 +2536,8 @@ static ssize_t trigger_test_store(struct device *dev,
 	if(index<0) index=0;
     dw791x=dw791x_devs[index];
     if(!dw791x->i2c_status){
-		DbgOut((DBL_ERROR, "%s: vibrator %d i2c fail\n", __func__, getActuatorIndex(dw791x->i2c)));
+        if(dw791x->i2c_fail_count<6)
+            DbgOut((DBL_ERROR, "%s: vibrator %d i2c fail\n", __func__, getActuatorIndex(dw791x->i2c)));
 		return count;
 	}
     
@@ -2509,7 +2630,8 @@ static ssize_t trigger_waveform_store(struct device *dev,
 		#endif
 	}
     if(!dw791x->i2c_status){
-		DbgOut((DBL_ERROR, "%s: vibrator %d i2c fail\n", __func__, getActuatorIndex(dw791x->i2c)));
+        if(dw791x->i2c_fail_count<6)
+            DbgOut((DBL_ERROR, "%s: vibrator %d i2c fail\n", __func__, getActuatorIndex(dw791x->i2c)));
 		return count;
 	}
 	dw791x->trigger_r=trigger_r; 
@@ -2559,7 +2681,8 @@ static ssize_t trigger3_waveform_store(struct device *dev,
 		#endif
 	}
     if(!dw791x->i2c_status){
-		DbgOut((DBL_ERROR, "%s: vibrator %d i2c fail\n", __func__, getActuatorIndex(dw791x->i2c)));
+        if(dw791x->i2c_fail_count<6)
+            DbgOut((DBL_ERROR, "%s: vibrator %d i2c fail\n", __func__, getActuatorIndex(dw791x->i2c)));
 		return count;
 	}
 	//trigger3, trigger slider(mem1, 2, 3, 4, 5)
@@ -2606,7 +2729,8 @@ static ssize_t trigger1_waveform_store(struct device *dev,
 		#endif
 	}
     if(!dw791x->i2c_status){
-		DbgOut((DBL_ERROR, "%s: vibrator %d i2c fail\n", __func__, getActuatorIndex(dw791x->i2c)));
+        if(dw791x->i2c_fail_count<6)
+            DbgOut((DBL_ERROR, "%s: vibrator %d i2c fail\n", __func__, getActuatorIndex(dw791x->i2c)));
 		return count;
 	}
 	//trigger1:
@@ -2685,7 +2809,8 @@ static ssize_t trigger_level_store(struct device *dev,
 		dw791x=dw791x_devs[1];
 		#endif
 		if(!dw791x->i2c_status){
-			DbgOut((DBL_ERROR, "%s: vibrator %d i2c fail\n", __func__, getActuatorIndex(dw791x->i2c)));
+            if(dw791x->i2c_fail_count<6)
+                DbgOut((DBL_ERROR, "%s: vibrator %d i2c fail\n", __func__, getActuatorIndex(dw791x->i2c)));
 			return count;
 		}
 		dw791x->trigger_level=level;
@@ -2715,7 +2840,8 @@ static ssize_t trigger_level_store(struct device *dev,
 		dw791x=dw791x_devs[0];
 		#endif
 		if(!dw791x->i2c_status){
-			DbgOut((DBL_ERROR, "%s: vibrator %d i2c fail\n", __func__, getActuatorIndex(dw791x->i2c)));
+            if(dw791x->i2c_fail_count<6)
+                DbgOut((DBL_ERROR, "%s: vibrator %d i2c fail\n", __func__, getActuatorIndex(dw791x->i2c)));
 			return count;
 		}
 		dw791x->trigger_level=level;
@@ -2886,7 +3012,8 @@ void set_trigger1_level(int channel, int level){
 		dw791x=dw791x_devs[0];
 		client=dw791x->i2c;
 		if(!dw791x->i2c_status){
-			DbgOut((DBL_ERROR, "%s: vibrator %d i2c fail\n", __func__, getActuatorIndex(dw791x->i2c)));
+            if(dw791x->i2c_fail_count<6)
+                DbgOut((DBL_ERROR, "%s: vibrator %d i2c fail\n", __func__, getActuatorIndex(dw791x->i2c)));
 		}
 		else{
 			dw791x_byte_write(client, 0x03, 0x61); // trig priority, trig2 master, trig1 as edge trigger input
@@ -2915,7 +3042,8 @@ void set_trigger1_level(int channel, int level){
 		dw791x=dw791x_devs[1];
 		client=dw791x->i2c;
 		if(!dw791x->i2c_status){
-			DbgOut((DBL_ERROR, "%s: vibrator %d i2c fail\n", __func__, getActuatorIndex(dw791x->i2c)));
+            if(dw791x->i2c_fail_count<6)
+                DbgOut((DBL_ERROR, "%s: vibrator %d i2c fail\n", __func__, getActuatorIndex(dw791x->i2c)));
 		}
 		else{
 			dw791x_byte_write(client, 0x03, 0x61); // trig priority, trig2 master, trig1 as edge trigger input
@@ -2947,7 +3075,8 @@ void set_trigger2_level(int channel, int level){
 		dw791x=dw791x_devs[0];
         
 		if(!dw791x || !dw791x->i2c_status){
-			DbgOut((DBL_ERROR, "%s: vibrator %d i2c fail\n", __func__, getActuatorIndex(dw791x->i2c)));
+            if(dw791x->i2c_fail_count<6)
+                DbgOut((DBL_ERROR, "%s: vibrator %d i2c fail\n", __func__, getActuatorIndex(dw791x->i2c)));
 		}
 		else{
 			dw791x->trigger_tap_level=level;
@@ -2973,7 +3102,8 @@ void set_trigger2_level(int channel, int level){
 	else if(channel&0x02){ //0832
 		dw791x=dw791x_devs[1];
 		if(!dw791x || !dw791x->i2c_status){
-			DbgOut((DBL_ERROR, "%s: vibrator %d i2c fail\n", __func__, getActuatorIndex(dw791x->i2c)));
+            if(dw791x->i2c_fail_count<6)
+                DbgOut((DBL_ERROR, "%s: vibrator %d i2c fail\n", __func__, getActuatorIndex(dw791x->i2c)));
 		}
 		else{
 			dw791x->trigger_slider_level=level;
@@ -3037,7 +3167,8 @@ void set_trigger3_level(int channel, int level){
 		dw791x=dw791x_devs[0];
 		client=dw791x->i2c;
 		if(!dw791x->i2c_status){
-			DbgOut((DBL_ERROR, "%s: vibrator %d i2c fail\n", __func__, getActuatorIndex(dw791x->i2c)));
+            if(dw791x->i2c_fail_count<6)
+                DbgOut((DBL_ERROR, "%s: vibrator %d i2c fail\n", __func__, getActuatorIndex(dw791x->i2c)));
 		}
 		else{
 			dw791x_byte_write(client, 0x03, 0x61); // trig priority, trig2 master, trig1 as edge trigger input
@@ -3081,7 +3212,8 @@ void set_trigger3_level(int channel, int level){
 		dw791x=dw791x_devs[1];
 		client=dw791x->i2c;
 		if(!dw791x->i2c_status){
-			DbgOut((DBL_ERROR, "%s: vibrator %d i2c fail\n", __func__, getActuatorIndex(dw791x->i2c)));
+            if(dw791x->i2c_fail_count<6)
+                DbgOut((DBL_ERROR, "%s: vibrator %d i2c fail\n", __func__, getActuatorIndex(dw791x->i2c)));
 		}
 		else{
 			dw791x_byte_write(client, 0x03, 0x61); // trig priority, trig2 master, trig1 as edge trigger input
@@ -3169,7 +3301,8 @@ static ssize_t trigger_gpio_store(struct device *dev,
 		dw791x=dw791x_devs[0];
 		#endif
 		if(!dw791x->i2c_status){
-			DbgOut((DBL_ERROR, "%s: vibrator %d i2c fail\n", __func__, getActuatorIndex(dw791x->i2c)));
+            if(dw791x->i2c_fail_count<6)
+                DbgOut((DBL_ERROR, "%s: vibrator %d i2c fail\n", __func__, getActuatorIndex(dw791x->i2c)));
 		}
 		else{
 			if(gTrigger1_3_Level!=level)
@@ -3218,7 +3351,8 @@ static ssize_t trigger_gpio_store(struct device *dev,
 			dw791x=dw791x_devs[1];
 			#endif
 			if(!dw791x->i2c_status){
-				DbgOut((DBL_ERROR, "%s: vibrator %d i2c fail\n", __func__, getActuatorIndex(dw791x->i2c)));
+                if(dw791x->i2c_fail_count<6)
+                    DbgOut((DBL_ERROR, "%s: vibrator %d i2c fail\n", __func__, getActuatorIndex(dw791x->i2c)));
 			}
 			else{
 				if(gTrigger1_3_Level!=level)
@@ -3329,7 +3463,8 @@ static ssize_t rtp_play_store(struct device *dev,
 	{
 		dw791x=dw791x_devs[0];
 		if(!dw791x->i2c_status){
-			DbgOut((DBL_ERROR, "%s: vibrator %d i2c fail\n", __func__, getActuatorIndex(dw791x->i2c)));
+            if(dw791x->i2c_fail_count<6)
+                DbgOut((DBL_ERROR, "%s: vibrator %d i2c fail\n", __func__, getActuatorIndex(dw791x->i2c)));
 			return count;
 		}
 		if(val<=0 || val>=65535) val=1;
@@ -3339,7 +3474,8 @@ static ssize_t rtp_play_store(struct device *dev,
 	{
 		dw791x=dw791x_devs[1];
 		if(!dw791x->i2c_status){
-			DbgOut((DBL_ERROR, "%s: vibrator %d i2c fail\n", __func__, getActuatorIndex(dw791x->i2c)));
+            if(dw791x->i2c_fail_count<6)
+                DbgOut((DBL_ERROR, "%s: vibrator %d i2c fail\n", __func__, getActuatorIndex(dw791x->i2c)));
 			return count;
 		}
 		if(val<=0 || val>=65535) val=1;
@@ -3354,7 +3490,8 @@ static char rtp_filename[100];
 void playrtpfile(struct dw791x_priv *dw791x, const char *filename,int repeat){
 	
 	if(!dw791x->i2c_status){
-		DbgOut((DBL_ERROR, "%s: vibrator %d i2c fail\n", __func__, getActuatorIndex(dw791x->i2c)));
+        if(dw791x->i2c_fail_count<6)
+            DbgOut((DBL_ERROR, "%s: vibrator %d i2c fail\n", __func__, getActuatorIndex(dw791x->i2c)));
 	}
 	else{
 		DbgOut((DBL_INFO, "%s:rtp file name=%s, repeat=%d\n", __func__, filename, repeat));
@@ -3371,6 +3508,10 @@ static ssize_t rtp_play_file_store(struct device *dev,
     struct dw791x_priv *dw791x=NULL;
     int repeat=1, channel=1;
     
+    if(!dw791x->i2c_status){
+		DbgOut((DBL_ERROR, "%s: vibrator %d i2c fail\n", __func__, getActuatorIndex(dw791x->i2c)));
+		return count;
+	}
     sscanf(buf, "%d %s %d", &channel, rtp_filename, &repeat);
 	if(gVibDebugLog&0x0010)//store node debug
 	{
@@ -3379,7 +3520,8 @@ static ssize_t rtp_play_file_store(struct device *dev,
 	if(channel&0x01){
 		dw791x=dw791x_devs[0];
 		if(!dw791x->i2c_status){
-			DbgOut((DBL_ERROR, "%s: vibrator %d i2c fail\n", __func__, getActuatorIndex(dw791x->i2c)));
+            if(dw791x->i2c_fail_count<6)
+                DbgOut((DBL_ERROR, "%s: vibrator %d i2c fail\n", __func__, getActuatorIndex(dw791x->i2c)));
 			return count;
 		}
 		//stop old vibration and then play new one.
@@ -3394,7 +3536,8 @@ static ssize_t rtp_play_file_store(struct device *dev,
 	if(channel&0x02){
 		dw791x=dw791x_devs[1];
 		if(!dw791x->i2c_status){
-			DbgOut((DBL_ERROR, "%s: vibrator %d i2c fail\n", __func__, getActuatorIndex(dw791x->i2c)));
+            if(dw791x->i2c_fail_count<6)
+                DbgOut((DBL_ERROR, "%s: vibrator %d i2c fail\n", __func__, getActuatorIndex(dw791x->i2c)));
 		}
 		else playrtpfile(dw791x, rtp_filename, repeat);
 	}
@@ -3412,7 +3555,7 @@ static ssize_t rtp_play_repeat_store(struct device *dev,
 	sscanf(buf, "%d %d %d", &channel, &val, &repeat);
     
 	//if(gVibDebugLog&0x0010)//store node debug
-		DbgOut((DBL_INFO, "%s:(1) channel=%d, num=%d, repeat=%d +++\n", __func__, channel, val, repeat));
+		DbgOut((DBL_INFO, "%s:(1) channel=%d, num=%d, repeat=%d +++\n", __func__, channel, val, repeat));   
 	if(repeat<0 || repeat > 65535) repeat=1;
 	if(val<=0 || val>=65535) val=1;
     //top or bot vibrates
@@ -3425,7 +3568,8 @@ static ssize_t rtp_play_repeat_store(struct device *dev,
 		dw791x=dw791x_devs[1];
     }
     if(!dw791x->i2c_status){
-        DbgOut((DBL_ERROR, "%s: vibrator %d i2c fail\n", __func__, getActuatorIndex(dw791x->i2c)));
+        if(dw791x->i2c_fail_count<6)
+            DbgOut((DBL_ERROR, "%s: vibrator %d i2c fail\n", __func__, getActuatorIndex(dw791x->i2c)));
         return count;
     }
     //stop old vibration and then play new one.
@@ -3490,7 +3634,8 @@ static ssize_t factory_test_store(struct device *dev,
 	if(index<0) index=0;
     dw791x=dw791x_devs[index];
     if(!dw791x->i2c_status){
-		DbgOut((DBL_ERROR, "%s: vibrator %d i2c fail\n", __func__, getActuatorIndex(dw791x->i2c)));
+        if(dw791x->i2c_fail_count<6)
+            DbgOut((DBL_ERROR, "%s: vibrator %d i2c fail\n", __func__, getActuatorIndex(dw791x->i2c)));
 		return count;
 	}
 
@@ -3531,7 +3676,8 @@ static ssize_t rtp_break_store(struct device *dev,
 		dw791x=dw791x_devs[0];
 		dw791x->bRTP_Play_Break=(val!=0) ? true:false;
 		if(!dw791x->i2c_status){
-			DbgOut((DBL_ERROR, "%s: vibrator %d i2c fail\n", __func__, getActuatorIndex(dw791x->i2c)));
+            if(dw791x->i2c_fail_count<6)
+                DbgOut((DBL_ERROR, "%s: vibrator %d i2c fail\n", __func__, getActuatorIndex(dw791x->i2c)));
 		}
 		else{
 			if(dw791x->bRTP_Play_Break){
@@ -3546,7 +3692,8 @@ static ssize_t rtp_break_store(struct device *dev,
 		dw791x=dw791x_devs[1];
 		dw791x->bRTP_Play_Break=(val!=0) ? true:false;
 		if(!dw791x->i2c_status){
-			DbgOut((DBL_ERROR, "%s: vibrator %d i2c fail\n", __func__, getActuatorIndex(dw791x->i2c)));
+            if(dw791x->i2c_fail_count<6)
+                DbgOut((DBL_ERROR, "%s: vibrator %d i2c fail\n", __func__, getActuatorIndex(dw791x->i2c)));
 		}
 		else{
 			if(dw791x->bRTP_Play_Break){
@@ -3571,7 +3718,8 @@ static ssize_t rtp_go_store(struct device *dev,
 	if(channel&0x01){
 		dw791x=dw791x_devs[0];
 		if(!dw791x->i2c_status){
-			DbgOut((DBL_ERROR, "%s: vibrator %d i2c fail\n", __func__, getActuatorIndex(dw791x->i2c)));
+            if(dw791x->i2c_fail_count<6)
+                DbgOut((DBL_ERROR, "%s: vibrator %d i2c fail\n", __func__, getActuatorIndex(dw791x->i2c)));
 		}
 		else{
 			if(gVibDebugLog&0x0010)//store node debug
@@ -3586,7 +3734,8 @@ static ssize_t rtp_go_store(struct device *dev,
 		dw791x=dw791x_devs[1];
 		dw791x->bRTP_Play_Break=(val!=0) ? true:false;
 		if(!dw791x->i2c_status){
-			DbgOut((DBL_ERROR, "%s: vibrator %d i2c fail\n", __func__, getActuatorIndex(dw791x->i2c)));
+            if(dw791x->i2c_fail_count<6)
+                DbgOut((DBL_ERROR, "%s: vibrator %d i2c fail\n", __func__, getActuatorIndex(dw791x->i2c)));
 		}
 		else{
 			if(gVibDebugLog&0x0010)//store node debug
@@ -3631,8 +3780,11 @@ static ssize_t vd_clamp_store(struct device *dev,
 	if(channel&0x01)//gamma
 	{
 		dw791x=dw791x_devs[0];
+        
 		if(!dw791x->i2c_status){
-			DbgOut((DBL_ERROR, "%s: vibrator %d i2c fail\n", __func__, getActuatorIndex(dw791x->i2c)));
+            dw791x->i2c_fail_count++;
+            if(dw791x->i2c_fail_count<6)
+                DbgOut((DBL_ERROR, "%s: vibrator %d i2c fail(%d)\n", __func__, getActuatorIndex(dw791x->i2c), dw791x->i2c_fail_count));
 			return count;
 		}
 		if(val<=0 || val > MAX_BOT_VD_CLAMP){
@@ -3658,7 +3810,8 @@ static ssize_t vd_clamp_store(struct device *dev,
 	{
 		dw791x=dw791x_devs[1];
 		if(!dw791x->i2c_status){
-			DbgOut((DBL_ERROR, "%s: vibrator %d i2c fail\n", __func__, getActuatorIndex(dw791x->i2c)));
+            if(dw791x->i2c_fail_count<6)
+                DbgOut((DBL_ERROR, "%s: vibrator %d i2c fail\n", __func__, getActuatorIndex(dw791x->i2c)));
 			return count;
 		}
 		if(val<=0 || val > MAX_TOP_VD_CLAMP){
@@ -3668,7 +3821,10 @@ static ssize_t vd_clamp_store(struct device *dev,
             }
 			val=MAX_TOP_VD_CLAMP;//MAX value
 		}
-		DbgOut((DBL_ERROR, "%s:val=%d\n", __func__, val));
+		if(gVibDebugLog&0x0010)//store node debug
+        {
+			DbgOut((DBL_ERROR, "%s:channel=%d, vmax(vd_clamp)=%d\n", __func__, channel, val));
+        }
 		dw791x_vd_clamp_set(dw791x->i2c, val);
 		if(gVibDebugLog&0x0010)//store node debug
         {
@@ -3713,7 +3869,8 @@ static ssize_t bst_option_store(struct device *dev,
 	if(index<0) index=0;
     dw791x=dw791x_devs[index];
     if(!dw791x->i2c_status){
-		DbgOut((DBL_ERROR, "%s: vibrator %d i2c fail\n", __func__, getActuatorIndex(dw791x->i2c)));
+        if(dw791x->i2c_fail_count<6)
+            DbgOut((DBL_ERROR, "%s: vibrator %d i2c fail\n", __func__, getActuatorIndex(dw791x->i2c)));
 		return count;
 	}
     sscanf(buf, "%d %d %d", &lv, &limit, &ofs);
@@ -3746,7 +3903,7 @@ static ssize_t activate_store(struct device *dev,
 			       struct device_attribute *attr, const char *buf,
 			       size_t count)
 {
-	int index=0;
+	int index=0, ret=0, val=0;
     struct dw791x_priv *dw791x=NULL;
     
 	if(gChannel>=3) index=0;
@@ -3755,11 +3912,37 @@ static ssize_t activate_store(struct device *dev,
 	if(index<0) index=0;
 
     dw791x=dw791x_devs[index];
-	DbgOut((DBL_INFO, "%s:channel=0x%0x %s(%dms)\n", __func__, gChannel,buf, dw791x->duration));
-	if(buf[0]=='1') {	
-		DbgOut((DBL_INFO, "%s:vibrator HAL: vibrate ...\n", __func__));
-		//dw791x_play_mode_sel(dw791x->i2c, 13,0,0,0);
-	}
+    ret=kstrtouint(buf, 0, &val);
+    if (val != 0 && val != 1)
+        return count;
+    #if 0
+    if(!dw791x->duration){
+        DbgOut((DBL_INFO, "%s:channel=0x%0x, activate=%d, %dms, exit\n", __func__, gChannel, val, dw791x->duration));
+        //dump_stack();
+        return count;
+    }
+    #endif
+    if(val==0)
+        DbgOut((DBL_INFO, "%s:channel=0x%0x,Vibrator off(%d)\n", __func__, gChannel, val));
+    else
+        DbgOut((DBL_INFO, "%s:channel=0x%0x, Vibrator on(%d), %dms\n", __func__, gChannel, val, dw791x->duration));
+    mutex_lock(&dw791x->dev_lock);
+    if(val==1){
+        dw791x_byte_write(dw791x->i2c, dw791x->play_mode, MEM);//set memory mode
+        dw791x_byte_write(dw791x->i2c, DW7914_WAVQ1, 1);//start
+        dw791x_byte_write(dw791x->i2c, DW7914_WAVE_SEQ_LOOP0, 0x0F);//1111 : Infinite loops
+        dw791x_byte_write(dw791x->i2c, DW7914_WAVQ2, 0x00);//stop
+        //dw791x_byte_write(dw791x->i2c, DW7914_MEM_LOOP, 0x0f);//1111 : Infinite loops. Stop with trigger or GO bit
+    }
+    if(dw791x->state==1)
+        hrtimer_cancel(&dw791x->timer);
+    dw791x->state = val;
+    if(val==1){
+        if(gVibDebugLog&0x0010)//store node debug
+            DbgOut((DBL_ERROR, "%s:schedule_work:dw791x_vibrator_work_routine\n", __func__));
+        schedule_work(&dw791x->vibrator_work);
+    }
+    mutex_unlock(&dw791x->dev_lock);
 	return count;
 }
 
@@ -3826,9 +4009,8 @@ static ssize_t state_store(struct device *dev,
 			       struct device_attribute *attr, const char *buf,
 			       size_t count)
 {
-	return count;
+    return count;
 }
-
 
 static ssize_t rtp_input_show(struct device *dev,
 			      struct device_attribute *attr, char *buf)
@@ -4322,14 +4504,19 @@ static int dw791x_probe(struct i2c_client* client, const struct i2c_device_id* i
 		}
 		//end
 		
-        /* get device id */
+        /* check i2c status: get device id */
+        dw791x->i2c_fail_count=0;
+        dw791x->i2c_debug=0;
+        dw791x->i2c_status=dw791x_i2c_status(dw791x);
+        /*
         if (2 != i2c_recv_buf(client, DW791x_PID, &dw791x->chipid, 1)) {
             DbgOut((DBL_ERROR, "dw791x_probe: failed to read chipid.\n"));
             dw791x->i2c_status=0;
-            /*return -ENODEV;*/
+            //return -ENODEV;
         }
         else
 			dw791x->i2c_status=1;
+        */
 
 		dw791x_device_init(client);
 		//init rtp_play workqueue
@@ -4391,13 +4578,11 @@ static int dw791x_probe(struct i2c_client* client, const struct i2c_device_id* i
         /* diagnostic */
         //dw791x_dump_registers(dw791x);
     }
-	
-    //dw791x->buffer[0] = DW7914_RTP_INPUT;
-    //trigger pin waveform configuration moved to dw791x_vibrator_control
-    //and called by init.asus.boot_vibrate.sh
-	//end
-    //trigger pin waveform configuration, double check
-    //dw791x_vibrator_control(dw791x->i2c, 8, 0);//this function has i2c failure detection
+	//AOSP vibration +++
+    hrtimer_init(&dw791x->timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
+    dw791x->timer.function = dw791x_vibrator_timer_func;
+    INIT_WORK(&dw791x->vibrator_work, dw791x_vibrator_work_routine);
+    //AOSP vibration ---
     DbgOut((DBL_ERROR, "%s:bus=%d, addr=0x%0x ---\n", __func__, bus, addr));
 
     return 0;
@@ -4424,6 +4609,7 @@ static int dw791x_remove(struct i2c_client* client)
 static int i2c_recv_buf(struct i2c_client *i2c, unsigned char reg, unsigned char *buf, int count)
 {
     struct i2c_msg msg[2];
+	struct dw791x_priv *dw791x =dw791x_devs[getActuatorIndex(i2c)];	
 
     msg[0].addr = i2c->addr;
     msg[0].flags = 0;
@@ -4434,19 +4620,43 @@ static int i2c_recv_buf(struct i2c_client *i2c, unsigned char reg, unsigned char
     msg[1].flags = I2C_M_RD;
     msg[1].len = count;
     msg[1].buf = buf;
-
-    return i2c_transfer(i2c->adapter, msg, 2);
+    if(dw791x->i2c_debug)
+    {
+		DbgOut((DBL_INFO, "%s i2c_recv_buf fail.!\n",dw791x->dev_name));
+        dw791x->i2c_status=0;
+        dw791x->i2c_fail_count++;
+        if(dw791x->i2c_fail_count>5)
+        {
+            DbgOut((DBL_INFO, "%s i2c_recv_buf fail exceeded 5 times, stop I2C function and error message!\n",dw791x->dev_name));
+        }
+        return -1;
+    }
+    else
+        return i2c_transfer(i2c->adapter, msg, 2);
 }
 static int i2c_send_buf(struct i2c_client *i2c, unsigned char *buf, int count)
 {
     struct i2c_msg msg;
+	struct dw791x_priv *dw791x =dw791x_devs[getActuatorIndex(i2c)];	
 
     msg.addr = i2c->addr;
     msg.flags = 0;
     msg.len = count;
     msg.buf = buf;
 
-    return i2c_transfer(i2c->adapter, &msg, 1);
+    if(dw791x->i2c_debug)
+    {
+		DbgOut((DBL_INFO, "%s i2c_send_buf fail.!\n",dw791x->dev_name));
+        dw791x->i2c_status=0;
+        dw791x->i2c_fail_count++;
+        if(dw791x->i2c_fail_count>5)
+        {
+            DbgOut((DBL_INFO, "%s i2c_send_buf fail exceeded 5 times, stop I2C function and error message!\n",dw791x->dev_name));
+        }
+        return -1;
+    }
+    else
+        return i2c_transfer(i2c->adapter, &msg, 1);
 }
 /* =====================================================================================
 function : dw791x devices register write function
@@ -4460,9 +4670,19 @@ static int dw791x_byte_write(struct i2c_client *client, u8 addr, u8 data)
 	struct dw791x_priv *dw791x =dw791x_devs[getActuatorIndex(client)];	
 
     ret = i2c_smbus_write_byte_data(client, addr, data);
+    if(dw791x->i2c_debug)
+    {
+        ret=-1;
+    }
 	
     if (ret < 0) {
 		DbgOut((DBL_INFO, "%s i2c byte write fail.!\n",dw791x->dev_name));
+        dw791x->i2c_status=0;
+        dw791x->i2c_fail_count++;
+        if(dw791x->i2c_fail_count > 5)
+        {
+            DbgOut((DBL_INFO, "%s i2c byte write fail exceeded 5 times, stop I2C function and error message!\n",dw791x->dev_name));
+        }
 	}
 	
 	return ret;
@@ -4481,7 +4701,8 @@ static int dw791x_word_write(struct i2c_client *client, u8 addr, u32 data)
 	u8 xbuf[3];
 	struct i2c_msg xfer[1];
 	struct i2c_client *i2c_fnc = client;
-
+    struct dw791x_priv *dw791x =dw791x_devs[getActuatorIndex(client)];
+    
 	memset(xbuf, 0, sizeof(xbuf));
 
 	xbuf[0] = (u8)addr;			
@@ -4494,6 +4715,17 @@ static int dw791x_word_write(struct i2c_client *client, u8 addr, u32 data)
 	xfer[0].buf = xbuf;
 	ret = i2c_transfer(i2c_fnc->adapter, xfer, 1);
 	
+    if(dw791x->i2c_debug)
+    {
+        ret=-1;
+		DbgOut((DBL_INFO, "%s dw791x_word_write fail.!\n",dw791x->dev_name));
+        dw791x->i2c_status=0;
+        dw791x->i2c_fail_count++;
+        if(dw791x->i2c_fail_count > 5)
+        {
+            DbgOut((DBL_INFO, "%s dw791x_word_write fail exceeded 5 times, stop I2C function and error message!\n",dw791x->dev_name));
+        }
+    }
 	return ret;
 }
 /* =====================================================================================
@@ -4514,9 +4746,20 @@ int dw791x_byte_read(struct i2c_client *client, u8 addr)
 		DbgOut((DBL_INFO, "Bus error, i2c byte read fail.!\n"));
 	dw791x =dw791x_devs[index];	
 	ret = i2c_smbus_read_byte_data(client, addr);
+    
+    if(dw791x->i2c_debug)
+    {
+        ret=-1;
+    }
 	
     if (ret < 0) {
 		DbgOut((DBL_INFO, "%s i2c byte read fail.!\n",dw791x->dev_name));
+        dw791x->i2c_status=0;
+        dw791x->i2c_fail_count++;
+        if(dw791x->i2c_fail_count > 5)
+        {
+            DbgOut((DBL_INFO, "%s i2c byte read fail exceeded 5 times, stop I2C function and error message!\n",dw791x->dev_name));
+        }
 	}	
 	
 	return ret;
@@ -4735,7 +4978,8 @@ static int dw7914_checksum(struct i2c_client *client, u32 type, u32 page)
 	struct dw791x_priv *dw791x =dw791x_devs[getActuatorIndex(client)];
 
 	if(!dw791x->i2c_status) {
-		DbgOut((DBL_INFO, "checksum vibrator %d i2c fail\n", getActuatorIndex(client)));
+        if(dw791x->i2c_fail_count<6)
+            DbgOut((DBL_INFO, "checksum vibrator %d i2c fail\n", getActuatorIndex(client)));
 		return -1;
 	}
 	dw791x_fifo_size_set(client, 4);
@@ -4874,7 +5118,8 @@ static int transfer_atuovib_wave(struct i2c_client *client, u8* wave)
 	struct dw791x_priv *dw791x =dw791x_devs[getActuatorIndex(client)];
 	
 	if(!dw791x->i2c_status){
-		DbgOut((DBL_INFO, "transfer_atuovib_wave vibrator %d i2c fail \n", getActuatorIndex(client)));
+        if(dw791x->i2c_fail_count<6)
+            DbgOut((DBL_INFO, "transfer_atuovib_wave vibrator %d i2c fail \n", getActuatorIndex(client)));
 		return -1;
 	}
 
@@ -4938,7 +5183,8 @@ static int request_transfer_rtp_wave(struct i2c_client *client, u8* wave, u32 re
 	dw791x=dw791x_devs[index];
 	
 	if(!dw791x->i2c_status){
-		DbgOut((DBL_ERROR, "request_transfer_rtp_wave vibrator %d i2c fail!\n", getActuatorIndex(client)));
+        if(dw791x->i2c_fail_count<6)
+            DbgOut((DBL_ERROR, "request_transfer_rtp_wave vibrator %d i2c fail!\n", getActuatorIndex(client)));
 		return -1;
 	}
     if(dw791x->bRTP_Play_Break){
@@ -5112,7 +5358,8 @@ static int request_transfer_mem_wave(struct i2c_client *client, u32 page, u32 po
 	struct dw791x_priv *dw791x =dw791x_devs[getActuatorIndex(client)];
 
 	if(!dw791x->i2c_status){
-		DbgOut((DBL_INFO, "request_transfer_mem_wave vibrator %d i2c fail \n", getActuatorIndex(client)));
+        if(dw791x->i2c_fail_count<6)
+            DbgOut((DBL_INFO, "request_transfer_mem_wave vibrator %d i2c fail \n", getActuatorIndex(client)));
 		return -1;
 	}
 	
@@ -5219,7 +5466,8 @@ IMMVIBESPIAPI VibeStatus ImmVibeSPI_ForceOut_AmpDisable(VibeUInt8 nActuatorIndex
 		return VIBE_E_FAIL;
 	}
 	if(!dw791x->i2c_status){
-		DbgOut((DBL_INFO, "%s: nActuatorIndex:%d i2c fail.\n", __func__, nActuatorIndex));
+        if(dw791x->i2c_fail_count<6)
+            DbgOut((DBL_INFO, "%s: nActuatorIndex:%d i2c fail(%d).\n", __func__, nActuatorIndex, dw791x->i2c_fail_count));
 		return VIBE_E_FAIL;
 	}
 	if(gVibDebugLog&0x0004)//enable immersion message
@@ -5264,7 +5512,8 @@ IMMVIBESPIAPI VibeStatus ImmVibeSPI_ForceOut_AmpEnable(VibeUInt8 nActuatorIndex)
 		return VIBE_E_FAIL;
 	}
 	if(!dw791x->i2c_status){
-		DbgOut((DBL_INFO, "%s: ActuatorIndex:%d i2c fail.\n", __func__, nActuatorIndex));
+        if(dw791x->i2c_fail_count<6)
+            DbgOut((DBL_INFO, "%s: ActuatorIndex:%d i2c fail (%d).\n", __func__, nActuatorIndex, dw791x->i2c_fail_count));
 		return VIBE_E_FAIL;
 	}
 	if(gVibDebugLog&0x0004)//enable immersion message
@@ -5399,7 +5648,8 @@ IMMVIBESPIAPI VibeStatus ImmVibeSPI_ForceOut_SetSamples(VibeUInt8 nActuatorIndex
 		return VIBE_E_FAIL;
 	}
 	if(!dw791x->i2c_status){
-		DbgOut((DBL_INFO, "%s:nActuatorIndex=%d , i2c fail \n", __func__, nActuatorIndex));
+        if(dw791x->i2c_fail_count<6)
+            DbgOut((DBL_INFO, "%s:nActuatorIndex=%d , i2c fail(%d) \n", __func__, nActuatorIndex, dw791x->i2c_fail_count));
 		return VIBE_E_FAIL;
 	}
     /* 
@@ -5452,7 +5702,8 @@ VibeStatus I2CWriteWithResendOnError_DW7914(struct dw791x_priv *dw791x, VibeUInt
 	int resample=gResample;
 	
 	if(!dw791x->i2c_status){
-		DbgOut((DBL_ERROR, "%s i2c fail \n", __func__));
+        if(dw791x->i2c_fail_count<6)
+            DbgOut((DBL_ERROR, "%s i2c fail \n", __func__));
 		return VIBE_E_FAIL;
 	}
 	if(gVibDebugLog&0x0008)//enable nForceData
@@ -5672,7 +5923,8 @@ IMMVIBESPIAPI VibeStatus ImmVibeSPI_Device_GetName(VibeUInt8 nActuatorIndex, cha
 	else{
 		/* Append revision number to the device name */
 		if(!dw791x->i2c_status){
-			DbgOut((DBL_INFO, "%s: i2c fail, assign default dev name \n", __func__));
+            if(dw791x->i2c_fail_count<6)
+                DbgOut((DBL_INFO, "%s: i2c fail, assign default dev name \n", __func__));
 			sprintf(szRevision, DEVICE_NAME "-DW791x-%02x", 0x7914F002);
 		}
 		else
@@ -5729,7 +5981,7 @@ IMMVIBESPIAPI int ImmVibeSPI_ForceOut_BufferFull(void)
 				status1 = ((u32)buf[0] << 8) | buf[1];			
 			}
 			else
-				DbgOut((DBL_INFO, "%s: read bus:0 buffer failed, status1=0\n", __func__));
+				DbgOut((DBL_INFO, "%s: read bus:0 buffer failed(%d), status1=0\n", __func__, dw791x_devs[0]->i2c_fail_count));
 		}
 	}
 	//read amplifier 2 buffer status
@@ -5745,7 +5997,7 @@ IMMVIBESPIAPI int ImmVibeSPI_ForceOut_BufferFull(void)
 				status2 = ((u32)buf[0] << 8) | buf[1];			
 			}
 			else
-				DbgOut((DBL_INFO, "%s: read bus:1 buffer failed, status2=0.\n", __func__));
+				DbgOut((DBL_INFO, "%s: read bus:1 buffer failed(%d), status2=0.\n", __func__, dw791x_devs[1]->i2c_fail_count));
 		}
 	}
 	//DbgOut((DBL_INFO, "%s: check status: status1=%d, status2=%d, FIFO %s\n", __func__, status1, status2, (status1 > status2 ? (status1 >= DW791X_FIFO_LEVEL) : (status2 >= DW791X_FIFO_LEVEL)) ?"Full":"Not Full"));

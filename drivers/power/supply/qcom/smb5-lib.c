@@ -33,6 +33,7 @@
 #include <linux/gpio.h>
 #include <linux/alarmtimer.h>
 #include "../../../usb/pd/usbpd.h"
+#include <linux/wakelock.h>
 //ASUS BSP add include files ---
 
 #define smblib_err(chg, fmt, ...)		\
@@ -94,6 +95,7 @@ volatile bool dual_port_once_flag = 0;
 bool pmic_inov_low = 0;
 volatile bool station_cable_flag = 0;
 bool bSkinTempOver = 0; // Add for ASUS SW INOV use
+struct wake_lock vbus_chk_wake_lock;
 //ASUS BSP : Add ASUS variables ---
 
 //ASUS BSP : Add extern variables +++
@@ -1129,7 +1131,8 @@ void smblib_hvdcp_detect_enable(struct smb_charger *chg, bool enable)
 {
 	int rc;
 	u8 mask;
-
+	CHG_DBG("Skip smblib_hvdcp_detect_enable() for aohai adapter WA");
+	return;//WA for aohai adapter
 	if (chg->hvdcp_disable || chg->pd_not_supported)
 		return;
 
@@ -5447,12 +5450,14 @@ void asus_typec_removal_function(struct smb_charger *chg)
 	cancel_delayed_work(&chg->asus_slow_insertion_work);
 	cancel_delayed_work(&chg->asus_set_usb_extcon_work);
 	cancel_delayed_work(&chg->asus_write_mux_setting_3);
+	cancel_delayed_work(&chg->asus_check_vbus_work);//WA for aohai adapter
 	//ASUS BSP : Add for battery health upgrade +++
 	if (g_fgDev != NULL) {
 		cancel_delayed_work(&g_fgDev->battery_health_work);
 		battery_health_data_reset();
 	}
 	//ASUS BSP : Add for battery health upgrade ---
+	wake_unlock(&vbus_chk_wake_lock);
 	alarm_cancel(&bat_alarm);
 	asus_flow_processing = 0;
 	asus_CHG_TYPE = 0;
@@ -5581,6 +5586,7 @@ void smblib_asus_monitor_start(struct smb_charger *chg, int time)
 	schedule_delayed_work(&chg->asus_min_monitor_work, msecs_to_jiffies(time));
 
 	schedule_delayed_work(&chg->asus_enable_inov_work, msecs_to_jiffies(60000));
+	schedule_delayed_work(&chg->asus_check_vbus_work, msecs_to_jiffies(60000));//WA for aohai adapter
 }
 
 void pca_jeita_stop_pmic_notifier(int stage)
@@ -6412,6 +6418,14 @@ void asus_chg_flow_work(struct work_struct *work)
 		smblib_asus_monitor_start(smbchg_dev, 0);		//ASUS BSP Austin_T: Jeita start
 		break;
 	case OCP_CHARGER_BIT:
+		//[+++]Support DCP/OCP up to 5V,2A
+		//Increase AICL threshold to 4.5V to avoid the adapter overheat if the adapter capability is less
+		rc = smblib_write(smbchg_dev, USBIN_CONT_AICL_THRESHOLD_REG, 0x5);
+		if (rc < 0) {
+			dev_err(smbchg_dev->dev, "Couldn't set default CHGR_ADC_RECHARGE_THRESHOLD_LSB_REG rc=%d\n", rc);
+		}
+		//[---]Support DCP/OCP up to 5V,2A
+
 		if (UFP_FLAG == 3 && !LEGACY_CABLE_FLAG)
 			set_icl = ICL_3000mA;
 		else if (UFP_FLAG == 2 && !LEGACY_CABLE_FLAG)
@@ -6440,6 +6454,14 @@ void asus_chg_flow_work(struct work_struct *work)
 	case DCP_CHARGER_BIT | QC_3P0_BIT:
 	case DCP_CHARGER_BIT | QC_2P0_BIT:
 	case DCP_CHARGER_BIT:
+		//[+++]Support DCP/OCP up to 5V,2A
+		//Increase AICL threshold to 4.5V to avoid the adapter overheat if the adapter capability is less
+		rc = smblib_write(smbchg_dev, USBIN_CONT_AICL_THRESHOLD_REG, 0x5);
+		if (rc < 0) {
+			dev_err(smbchg_dev->dev, "Couldn't set default CHGR_ADC_RECHARGE_THRESHOLD_LSB_REG rc=%d\n", rc);
+		}
+		//[---]Support DCP/OCP up to 5V,2A
+
 		if (!fake_er_stage_flag && (g_ASUS_hwID < ZS660KL_ER1 ||
 			(g_ASUS_hwID >= ZS660KL_CN_EVB && g_ASUS_hwID < ZS660KL_CN_ER1)))
 			goto BF_ER;
@@ -7096,6 +7118,12 @@ void asus_insertion_initial_settings(struct smb_charger *chg)
 	if (rc < 0) {
 		dev_err(chg->dev, "Couldn't set default CMD_ICL_OVERRIDE_REG rc=%d\n", rc);
 	}
+	//[+++]WA for aohai adapter
+    rc = smblib_write(chg, USBIN_OPTIONS_1_CFG_REG, 0x1E);
+	if (rc < 0) {
+		dev_err(chg->dev, "Couldn't set USBIN_OPTIONS_1_CFG_REG to 0x1E rc=%d\n", rc);
+	}
+	//[---]WA for aohai adapter
 }
 //ASUS BSP : Add ASUS Adapter Detecting ---
 
@@ -7537,6 +7565,52 @@ void asus_enable_inov_work(struct work_struct *work)
 	asus_enable_inov(usb_present);
 }
 //ASUS BSP : Add for enable INOV work ---
+
+// WA for aohai adapter +++
+void asus_check_vbus_work(struct work_struct *work)
+{
+	int rc;
+	union power_supply_propval voltage_val;
+	u8 stat;
+	int i;
+	int pulse_cnt = 0;
+
+	smblib_get_prop_usb_voltage_now(smbchg_dev, &voltage_val);
+
+	rc = smblib_read(smbchg_dev, APSD_RESULT_STATUS_REG, &stat);
+	if (rc < 0)
+		CHG_DBG_E("Couldn't read APSD_RESULT_STATUS rc=%d\n", rc);
+
+	CHG_DBG("input_voltage = %d, 0x1308 = 0x%x\n", voltage_val.intval, stat);
+	if((voltage_val.intval < 8000000) && stat == 0x48){
+		pulse_cnt = (9000000-voltage_val.intval)/200000;
+		if (pulse_cnt < 0)
+			pulse_cnt = 0;
+		CHG_DBG("pulse_cnt = %d\n", pulse_cnt);
+		for(i=0; i<pulse_cnt; i++){
+			rc = smblib_write(smbchg_dev, 0x1343, 0x01);
+			if (rc < 0)
+				CHG_DBG_E("Couldn't set 0x1362 to 0x3E rc=%d\n", rc);
+
+			msleep(100);
+		}
+
+		msleep(5000);
+
+		smblib_get_prop_usb_voltage_now(smbchg_dev, &voltage_val);
+		CHG_DBG("input_voltage = %d after waiting 5 sec\n", voltage_val.intval);
+		if(voltage_val.intval < 5250000){
+			rc = smblib_write(smbchg_dev, 0x1343, 0x10);
+			if (rc < 0)
+				CHG_DBG_E("Couldn't set 0x1343 to 0x10 rc=%d\n", rc);
+		}
+		
+		rc = asus_exclusive_vote(smbchg_dev->usb_icl_votable, ASUS_ICL_VOTER, true, 1750000);
+		if (rc < 0)
+			CHG_DBG_E("Failed to set USBIN_CURRENT_LIMIT to 500mA\n");
+	}
+}
+// WA for aohai adapter ---
 
 //[+++]Implement the ASUS SW INOV
 //#define asus_ATM_min	700000; //The min value of ATM is 700mA
@@ -8297,6 +8371,8 @@ void smblib_usb_plugin_locked(struct smb_charger *chg)
 		b_Is_one_pa = false;
 		b_zero_pa = false;
 		//[---]Cancel the workqueue for longer 1 percentage usage
+		CHG_DBG("Start a 70 sec vbus_check_wake_lock\r\n");
+		wake_lock_timeout(&vbus_chk_wake_lock, msecs_to_jiffies(70000));
 	} else {
 		//[+++] Workaround for dual port design. Bottom is charging, side has OTG device plug-in
 		//Rollback the 0x1544[4] and 0x1550[3] to default
@@ -10481,7 +10557,9 @@ int smblib_init(struct smb_charger *chg)
 	INIT_DELAYED_WORK(&chg->asus_30W_Dual_chg_work, asus_30W_Dual_chg_work);
 	INIT_DELAYED_WORK(&chg->asus_enable_inov_work, asus_enable_inov_work);
 	INIT_DELAYED_WORK(&chg->asus_set_usb_extcon_work, asus_set_usb_extcon_work);
+	INIT_DELAYED_WORK(&chg->asus_check_vbus_work, asus_check_vbus_work);// WA for aohai adapter
 	alarm_init(&bat_alarm, ALARM_REALTIME, batAlarm_handler);
+	wake_lock_init(&vbus_chk_wake_lock, WAKE_LOCK_SUSPEND, "vbus_check_wake_lock");
 	//ASUS BSP : Add the work ---
 
 	if (chg->wa_flags & CHG_TERMINATION_WA) {
@@ -10638,6 +10716,7 @@ int smblib_deinit(struct smb_charger *chg)
 	}
 
 	smblib_iio_deinit(chg);
+	wake_lock_destroy(&vbus_chk_wake_lock);
 
 	return 0;
 }

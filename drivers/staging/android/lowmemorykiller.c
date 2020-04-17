@@ -599,22 +599,12 @@ static unsigned long lowmem_scan(struct shrinker *s, struct shrink_control *sc)
 		}
 
 
-		if (oom_score_adj < min_score_adj && 
-			strstr(p->comm,"youtube")== NULL ) { 
+		if (oom_score_adj < min_score_adj) {
 			task_unlock(p);
 			continue;
 		}
 		tasksize = get_mm_rss(p->mm);
 		task_unlock(p);
-		
-		if(strstr(p->comm,"youtube")!= NULL ){
-			if( oom_score_adj > 900)
-				tasksize = INT_MAX ;
-			else
-				continue;
-		}
-
-		
 		if (tasksize <= 0)
 			continue;
 		selected_index = 0;

@@ -242,7 +242,7 @@ static bool sanity_check_inode(struct inode *inode, struct page *node_page)
 			fi->i_extra_isize % sizeof(__le32)) {
 		set_sbi_flag(sbi, SBI_NEED_FSCK);
 		f2fs_msg(sbi->sb, KERN_WARNING,
-			"%s: inode (ino=%lx) has corrupted i_extra_isize: %d, "
+			"%s: [fsck] inode (ino=%lx) has corrupted i_extra_isize: %d, "
 			"max: %zu",
 			__func__, inode->i_ino, fi->i_extra_isize,
 			F2FS_TOTAL_EXTRA_ATTR_SIZE);
@@ -256,7 +256,7 @@ static bool sanity_check_inode(struct inode *inode, struct page *node_page)
 		fi->i_inline_xattr_size > MAX_INLINE_XATTR_SIZE)) {
 		set_sbi_flag(sbi, SBI_NEED_FSCK);
 		f2fs_msg(sbi->sb, KERN_WARNING,
-			"%s: inode (ino=%lx) has corrupted "
+			"%s: [fsck] inode (ino=%lx) has corrupted "
 			"i_inline_xattr_size: %d, max: %zu",
 			__func__, inode->i_ino, fi->i_inline_xattr_size,
 			MAX_INLINE_XATTR_SIZE);

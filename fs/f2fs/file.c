@@ -1966,6 +1966,7 @@ static int f2fs_ioc_shutdown(struct file *filp, unsigned long arg)
 		set_sbi_flag(sbi, SBI_IS_SHUTDOWN);
 		break;
 	case F2FS_GOING_DOWN_NEED_FSCK:
+		f2fs_msg(sbi->sb, KERN_WARNING,"f2fs_ioc_shutdown(): Set SBI_NEED_FSCK for F2FS_GOING_DOWN_NEED_FSCK");
 		set_sbi_flag(sbi, SBI_NEED_FSCK);
 		set_sbi_flag(sbi, SBI_CP_DISABLED_QUICK);
 		set_sbi_flag(sbi, SBI_IS_DIRTY);

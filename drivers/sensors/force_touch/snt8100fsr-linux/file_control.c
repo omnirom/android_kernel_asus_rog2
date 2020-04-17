@@ -1075,15 +1075,17 @@ void grip_tap_enable_func(int tap_id, int val, uint16_t* reg ) {
 		grip_enable_func_noLock(1);
 	}
 
+	if(tap_id == 0)
+		grip_status_g->G_TAP1_EN = val;
+	else if(tap_id ==1)
+		grip_status_g->G_TAP2_EN = val;
+	else if(tap_id ==2)
+		grip_status_g->G_TAP3_EN = val;
+	if(grip_status_g->G_EN == -1)
+		grip_status_g->G_EN = val;
+	
 	/* when G_EN=0 which means that all gestures close, don't wakeup chip and do setting */
 	if(grip_status_g->G_EN == 1){
-		if(tap_id == 0)
-			grip_status_g->G_TAP1_EN = val;
-		else if(tap_id ==1)
-			grip_status_g->G_TAP2_EN = val;
-		else if(tap_id ==2)
-			grip_status_g->G_TAP3_EN = val;
-		
 		if(chip_reset_flag == 1){
 			mutex_unlock(&snt8100fsr_g->ap_lock);
 			return;
@@ -1772,12 +1774,15 @@ void grip_squeeze_enable_func(int sq_id, int val, uint16_t* reg){
 		grip_enable_func_noLock(1);
 	}
 	
+	if(sq_id == 0)
+		grip_status_g->G_SQUEEZE1_EN = val;
+	else if(sq_id ==1)
+		grip_status_g->G_SQUEEZE2_EN = val;
+	if(grip_status_g->G_EN == -1)
+		grip_status_g->G_EN = val;
+	
 	/* when G_EN=0 which means that all gestures close, don't wakeup chip and do setting */
 	if(grip_status_g->G_EN == 1){
-		if(sq_id == 0)
-			grip_status_g->G_SQUEEZE1_EN = val;
-		else if(sq_id ==1)
-			grip_status_g->G_SQUEEZE2_EN = val;
 		
 		if(chip_reset_flag == 1){
 			mutex_unlock(&snt8100fsr_g->ap_lock);
@@ -2104,9 +2109,12 @@ void grip_slide1_enable_func(int val){
 		grip_enable_func_noLock(1);
 	}
 	
+	grip_status_g->G_SLIDE1_EN = val;
+	if(grip_status_g->G_EN == -1)
+		grip_status_g->G_EN = val;
+	
 	/* when G_EN=0 which means that all gestures close, don't wakeup chip and do setting */
 	if(grip_status_g->G_EN == 1){
-		grip_status_g->G_SLIDE1_EN = val;
 		if(chip_reset_flag == 1){
 			mutex_unlock(&snt8100fsr_g->ap_lock);
 			return;
@@ -2137,9 +2145,12 @@ void grip_slide2_enable_func(int val){
 		grip_enable_func_noLock(1);
 	}
 
+	grip_status_g->G_SLIDE2_EN = val;
+	if(grip_status_g->G_EN == -1)
+		grip_status_g->G_EN = val;
+
 	/* when G_EN=0 which means that all gestures close, don't wakeup chip and do setting */
 	if(grip_status_g->G_EN == 1){
-		grip_status_g->G_SLIDE2_EN = val;
 		if(chip_reset_flag == 1){
 			mutex_unlock(&snt8100fsr_g->ap_lock);
 			return;
@@ -2276,9 +2287,12 @@ void grip_swipe1_enable_func(int val){
 		grip_enable_func_noLock(1);
 	}
 	
+	grip_status_g->G_SWIPE1_EN = val;
+	if(grip_status_g->G_EN == -1)
+		grip_status_g->G_EN = val;
+		
 	/* when G_EN=0 which means that all gestures close, don't wakeup chip and do setting */
 	if(grip_status_g->G_EN == 1){
-		grip_status_g->G_SWIPE1_EN = val;
 		if(chip_reset_flag == 1){
 			mutex_unlock(&snt8100fsr_g->ap_lock);
 			return;
@@ -2307,9 +2321,12 @@ void grip_swipe2_enable_func(int val){
 		grip_enable_func_noLock(1);
 	}
 	
+	grip_status_g->G_SWIPE2_EN = val;
+	if(grip_status_g->G_EN == -1)
+		grip_status_g->G_EN = val;
+		
 	/* when G_EN=0 which means that all gestures close, don't wakeup chip and do setting */
 	if(grip_status_g->G_EN == 1){
-		grip_status_g->G_SWIPE2_EN = val;
 		if(chip_reset_flag == 1){
 			mutex_unlock(&snt8100fsr_g->ap_lock);
 			return;

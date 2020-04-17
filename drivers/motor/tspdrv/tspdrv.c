@@ -135,7 +135,6 @@ asmlinkage static void _DbgOutV(int level, const char *fmt,va_list args)
 
     int ret;
     size_t size = sizeof(printk_buf);
-    
     memset(printk_buf, 0, sizeof(printk_buf));
     ret = scnprintf(printk_buf, size, KERN_EMERG "%s:%s %s",
          MODULE_NAME, prefix[level], fmt);

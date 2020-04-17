@@ -46,6 +46,7 @@
 /* ASUS BSP Display +++ */
 #define COMMIT_FRAMES_COUNT 5
 int display_commit_cnt = COMMIT_FRAMES_COUNT;
+bool g_allow_dfps = false;
 /* ASUS BSP Display --- */
 
 unsigned int g_frame_count = 0;
@@ -4424,6 +4425,9 @@ void sde_crtc_commit_kickoff(struct drm_crtc *crtc,
 	/* ASUS BSP Display +++ */
 	if (display_commit_cnt > 0 && !strcmp(crtc->name, "crtc-0")) {
 		pr_err("fbc%d\n", display_commit_cnt);
+		if (display_commit_cnt == 4)
+			g_allow_dfps = true;
+
 		if ( 5 == display_commit_cnt)
 			TP_call_FOD( 11, true);
 		if (g_recovery_mode && display_commit_cnt == 1)

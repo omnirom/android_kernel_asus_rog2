@@ -3876,10 +3876,14 @@ void asus_probe_pmic_settings(struct smb_charger *chg)
 	//[---]Change to here from asus_insertion_initial_settings() in smb5-lib.c
 
 	//[+++]Modify the spec, allow DCP up to 5A*2A=10W. Need to increase AICL threshold
+	//Don't alway set AICL_THRESHOLD to 4.5V, this could get less current when the cable loss is big
+	//DO this when the APSD result is DCP or OCP
+	/*
 	rc = smblib_write(chg, USBIN_CONT_AICL_THRESHOLD_REG, 0x5);
 	if (rc < 0) {
 		dev_err(chg->dev, "Couldn't set default CHGR_ADC_RECHARGE_THRESHOLD_LSB_REG rc=%d\n", rc);
 	}
+	*/
 	//[---]Modify the spec, allow DCP up to 5A*2A=10W. Need to increase AICL threshold
 
 }

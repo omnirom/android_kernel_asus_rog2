@@ -1114,6 +1114,7 @@ retry_flush_quotas:
 		int locked;
 
 		if (++cnt > DEFAULT_RETRY_QUOTA_FLUSH_COUNT) {
+		        f2fs_msg(sbi->sb, KERN_WARNING,"set SBI_QUOTA_SKIP_FLUSH");
 			set_sbi_flag(sbi, SBI_QUOTA_SKIP_FLUSH);
 			f2fs_lock_all(sbi);
 			goto retry_flush_dents;
@@ -1252,8 +1253,10 @@ static void update_ckpt_flags(struct f2fs_sb_info *sbi, struct cp_control *cpc)
 	else
 		__clear_ckpt_flags(ckpt, CP_ORPHAN_PRESENT_FLAG);
 
-	if (is_sbi_flag_set(sbi, SBI_NEED_FSCK))
+	if (is_sbi_flag_set(sbi, SBI_NEED_FSCK)) {
+		f2fs_msg(sbi->sb, KERN_WARNING,"update_ckpt_flags(): Set CP_FSCK_FLAG for SBI_NEED_FSCK");
 		__set_ckpt_flags(ckpt, CP_FSCK_FLAG);
+	}
 
 	if (is_sbi_flag_set(sbi, SBI_CP_DISABLED))
 		__set_ckpt_flags(ckpt, CP_DISABLED_FLAG);
@@ -1265,15 +1268,17 @@ static void update_ckpt_flags(struct f2fs_sb_info *sbi, struct cp_control *cpc)
 	else
 		__clear_ckpt_flags(ckpt, CP_DISABLED_QUICK_FLAG);
 
-	if (is_sbi_flag_set(sbi, SBI_QUOTA_SKIP_FLUSH))
+	if (is_sbi_flag_set(sbi, SBI_QUOTA_SKIP_FLUSH)) {
+		f2fs_msg(sbi->sb, KERN_WARNING,"CP_QUOTA_NEED_FSCK_FLAG is set because of SBI_QUOTA_SKIP_FLUSH");
 		__set_ckpt_flags(ckpt, CP_QUOTA_NEED_FSCK_FLAG);
-	/*
-	 * TODO: we count on fsck.f2fs to clear this flag until we figure out
-	 * missing cases which clear it incorrectly.
-	 */
+        } else {
+		__clear_ckpt_flags(ckpt, CP_QUOTA_NEED_FSCK_FLAG);
+	}
 
-	if (is_sbi_flag_set(sbi, SBI_QUOTA_NEED_REPAIR))
+	if (is_sbi_flag_set(sbi, SBI_QUOTA_NEED_REPAIR)) {
+		f2fs_msg(sbi->sb, KERN_WARNING,"CP_QUOTA_NEED_FSCK_FLAG is set because of CP_QUOTA_NEED_FSCK_FLAG");
 		__set_ckpt_flags(ckpt, CP_QUOTA_NEED_FSCK_FLAG);
+	}
 
 	/* set this flag to activate crc|cp_ver for recovery */
 	__set_ckpt_flags(ckpt, CP_CRC_RECOVERY_FLAG);

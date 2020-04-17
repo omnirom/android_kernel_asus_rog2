@@ -1854,7 +1854,7 @@ static int f2fs_quota_on_mount(struct f2fs_sb_info *sbi, int type)
 {
 	if (is_set_ckpt_flags(sbi, CP_QUOTA_NEED_FSCK_FLAG)) {
 		f2fs_msg(sbi->sb, KERN_ERR,
-			"quota sysfile may be corrupted, skip loading it");
+			"[fsck] quota sysfile may be corrupted, skip loading it");
 		return 0;
 	}
 
@@ -1930,7 +1930,7 @@ static int f2fs_enable_quotas(struct super_block *sb)
 
 	if (is_set_ckpt_flags(F2FS_SB(sb), CP_QUOTA_NEED_FSCK_FLAG)) {
 		f2fs_msg(sb, KERN_ERR,
-			"quota file may be corrupted, skip loading it");
+			"f2fs_enable_quotas(): quota file may be corrupted, skip loading it");
 		return 0;
 	}
 
@@ -3160,10 +3160,7 @@ try_onemore:
 
 #ifdef CONFIG_QUOTA
 	sb->dq_op = &f2fs_quota_operations;
-	if (f2fs_sb_has_quota_ino(sbi))
-		sb->s_qcop = &dquot_quotactl_sysfile_ops;
-	else
-		sb->s_qcop = &f2fs_quotactl_ops;
+	sb->s_qcop = &f2fs_quotactl_ops;
 	sb->s_quota_types = QTYPE_MASK_USR | QTYPE_MASK_GRP | QTYPE_MASK_PRJ;
 
 	if (f2fs_sb_has_quota_ino(sbi)) {
@@ -3257,8 +3254,10 @@ try_onemore:
 		goto free_meta_inode;
 	}
 
-	if (__is_set_ckpt_flags(F2FS_CKPT(sbi), CP_QUOTA_NEED_FSCK_FLAG))
+	if (__is_set_ckpt_flags(F2FS_CKPT(sbi), CP_QUOTA_NEED_FSCK_FLAG)) {
+		f2fs_msg(sb, KERN_ERR, "f2fs_fill_super(): Set SBI_QUOTA_NEED_REPAIR because of CP_QUOTA_NEED_FSCK_FLAG");
 		set_sbi_flag(sbi, SBI_QUOTA_NEED_REPAIR);
+	}
 	if (__is_set_ckpt_flags(F2FS_CKPT(sbi), CP_DISABLED_QUICK_FLAG)) {
 		set_sbi_flag(sbi, SBI_CP_DISABLED_QUICK);
 		sbi->interval_time[DISABLE_TIME] = DEF_DISABLE_QUICK_INTERVAL;
@@ -3386,8 +3385,10 @@ try_onemore:
 			goto free_meta;
 		}
 
-		if (need_fsck)
+		if (need_fsck) {
+			f2fs_msg(sb, KERN_ERR, "f2fs_fill_super(): Set SBI_NEED_FSCK because of need_fsck");
 			set_sbi_flag(sbi, SBI_NEED_FSCK);
+		}
 
 		if (skip_recovery)
 			goto reset_checkpoint;
@@ -3398,7 +3399,7 @@ try_onemore:
 				skip_recovery = true;
 			need_fsck = true;
 			f2fs_msg(sb, KERN_ERR,
-				"Cannot recover all fsync data errno=%d", err);
+				"f2fs_fill_super(): [fsck] Cannot recover all fsync data errno=%d", err);
 			goto free_meta;
 		}
 	} else {

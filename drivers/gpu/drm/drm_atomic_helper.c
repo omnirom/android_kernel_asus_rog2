@@ -42,6 +42,7 @@ bool changeFps = false;
 int lastFps = 120;
 EXPORT_SYMBOL(lastFps);
 extern bool g_enter_AOD;
+extern bool g_allow_dfps;
 /* ASUS BSP Display --- */
 
 /**
@@ -598,7 +599,7 @@ drm_atomic_helper_check_modeset(struct drm_device *dev,
 			/* run time */
 			if ((old_crtc_state->enable == new_crtc_state->enable) &&
 				(old_crtc_state->active == new_crtc_state->active)) {
-				if (lastFps != new_crtc_state->mode.vrefresh) {
+				if (lastFps != new_crtc_state->mode.vrefresh && !changeFps && g_allow_dfps) {
 					pr_err("[Display] new fps(%d), lastFps(%d)\n", new_crtc_state->mode.vrefresh, lastFps);
 					lastFps = new_crtc_state->mode.vrefresh;
 					changeFps = true;

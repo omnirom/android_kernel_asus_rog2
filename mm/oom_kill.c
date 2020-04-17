@@ -1160,7 +1160,7 @@ void add_to_oom_reaper(struct task_struct *p)
 	dump_killed_info(p);
 	task_unlock(p);
 
-	if (__ratelimit(&reaper_rs) && p->signal->oom_score_adj == 0) {
+	if (__ratelimit(&reaper_rs) && (p->signal->oom_score_adj <= 250) && (strcmp("lmkd",current->comm) == 0)) {
 		show_mem(SHOW_MEM_FILTER_NODES, NULL);
 		show_mem_call_notifiers();
 		if (sysctl_oom_dump_tasks)

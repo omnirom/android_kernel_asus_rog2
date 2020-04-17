@@ -2883,6 +2883,34 @@ unled:
 	return err;*/
 }
 
+static void ene_6k582_shutdown(struct i2c_client *client)
+{
+	int err = 0;
+	
+	printk("[AURA_POGO] ene_6k582_shutdown entry.\n");
+
+	if (!station_aura_pogo){
+		printk("[AURA_POGO] ene_6k582_shutdown : err %d,return since no station\n", err);
+		return ;		
+	}
+	mutex_lock(&g_pdata->ene_mutex);
+	err = ene_6k582_write_bytes(client, 0x8451,1); //mode
+	if (err !=1){
+		printk("[AURA_POGO] ene_6k582_write_bytes:err %d\n", err);
+		mutex_unlock(&g_pdata->ene_mutex);
+		return ;
+	}
+	err = ene_6k582_write_bytes(client, 0x8452, 1); //apply
+	if (err !=1){
+		printk("[AURA_POGO] ene_6k582_write_bytes:err %d\n", err);
+		mutex_unlock(&g_pdata->ene_mutex);
+		return ;
+	}
+	mutex_unlock(&g_pdata->ene_mutex);
+
+	printk("[AURA_POGO] ene_6k582_shutdown set to mode 0\n");
+	return ;
+}
 static int ene_6k582_remove(struct i2c_client *client)
 {
 	int err = 0;
@@ -2894,7 +2922,11 @@ static int ene_6k582_remove(struct i2c_client *client)
 	}
 
 	ec_i2c_set_gpio(0x34, 0);
-
+	
+	msm_drm_unregister_client(&platform_data->notifier);
+	mutex_destroy(&platform_data->ene_mutex);
+	//hid_vote_unregister(platform_data->hid_suspend_id, "AURA_POGO");
+	
 // unregister
 	printk("[AURA_POGO] sysfs_remove_group\n");
 	sysfs_remove_group(&platform_data->led.dev->kobj, &pwm_attr_group);
@@ -2905,10 +2937,6 @@ static int ene_6k582_remove(struct i2c_client *client)
 // free pointer
 //	printk("[AURA_POGO] Free platform_data\n");
 //	kfree(platform_data);
-
-	mutex_destroy(&platform_data->ene_mutex);
-	//hid_vote_unregister(platform_data->hid_suspend_id, "AURA_POGO");
-	msm_drm_unregister_client(&platform_data->notifier);
 
 	printk("[AURA_POGO] ene_6k582_remove : err %d\n", err);
 	return 0;
@@ -3035,6 +3063,7 @@ static struct i2c_driver ene_6k582_driver = {
 		.of_match_table	= ene_match_table,
 	},
 	.probe		= ene_6k582_probe,
+	.shutdown   = ene_6k582_shutdown,
 	.remove		= ene_6k582_remove,
 	.id_table 	= ene_6k582_id,
 };
