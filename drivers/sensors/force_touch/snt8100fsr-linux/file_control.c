@@ -95,7 +95,7 @@ static void set_pinctrl(struct device *dev, char *str);
 void Power_Control(int en);
 static void Grip_Apply_Golden_K(void);
 
-extern void dw7914_enable_trigger2(int channel, bool enable);
+//extern void dw7914_enable_trigger2(int channel, bool enable);
 
 
 struct workqueue_struct *asus_wq;
@@ -2630,7 +2630,7 @@ void grip_dump_status_func(struct work_struct *work){
 	grip_squeeze1_enable_func(grip_status_g->G_SQUEEZE1_EN);
 	Into_DeepSleep_fun();
 	PRINT_INFO("Enable gamma vib");
-	dw7914_enable_trigger2(1, 1);
+	//dw7914_enable_trigger2(1, 1);
 }
 #define GRIP_SOC_GPIO21_OFF_LOOKUP_STATE		"pinctrl_1v2_2v8_close"
 #define GRIP_SOC_GPIO21_ON_LOOKUP_STATE		"pinctrl_1v2_2v8_init"
@@ -2645,7 +2645,7 @@ void Power_Control(int en){
 	}else if(en == 1){
 		G_Power_State = 1;
 		PRINT_INFO("Close gamma vib");
-		dw7914_enable_trigger2(1, 0);
+		//dw7914_enable_trigger2(1, 0);
 		PRINT_INFO("Set pinctl: RST down");
 		set_pinctrl(snt8100fsr_g->dev, GRIP_PM8150B_GPIO12_OFF);
 		msleep(500);

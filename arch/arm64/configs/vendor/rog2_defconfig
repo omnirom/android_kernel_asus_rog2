@@ -5284,7 +5284,7 @@ CONFIG_ESOC_MDM_DBG_ENG=y
 #
 # TouchSense driver support
 #
-CONFIG_TSPDRV=y
+# CONFIG_TSPDRV is not set
 
 #
 # Firmware Drivers
