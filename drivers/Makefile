@@ -212,15 +212,6 @@ obj-y               +=fan/
 obj-y               +=dt_aura/
 # ASUS_SZ_BSP Cassie: aura sync driver for dt---
 
-#Texura
-ifdef CONFIG_TEXURA_USERDEBUG
-	obj-y				+= ntfs/userdebug/
-	obj-y				+= exfat/userdebug/
-else
-	obj-y				+= ntfs/user/
-	obj-y				+= exfat/user/
-endif
-
 #ASUS_BSP Vibrator +++
 obj-$(CONFIG_TSPDRV) += motor/tspdrv/
 #ASUS_BSP Vibrator ---
