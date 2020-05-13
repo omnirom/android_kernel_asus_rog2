@@ -103,8 +103,8 @@ static void convert_to_dsi_mode(const struct drm_display_mode *drm_mode,
 	//	dsi_mode->dsi_mode_flags |= DSI_MODE_FLAG_DFPS;
 	if (msm_needs_vblank_pre_modeset(drm_mode))
 		dsi_mode->dsi_mode_flags |= DSI_MODE_FLAG_VBLANK_PRE_MODESET;
-	if (msm_is_mode_seamless_dms(drm_mode))
-		dsi_mode->dsi_mode_flags |= DSI_MODE_FLAG_DMS;
+	//if (msm_is_mode_seamless_dms(drm_mode))
+	//	dsi_mode->dsi_mode_flags |= DSI_MODE_FLAG_DMS;
 	//if (msm_is_mode_seamless_vrr(drm_mode))
 	//	dsi_mode->dsi_mode_flags |= DSI_MODE_FLAG_VRR;
 	if (msm_is_mode_seamless_dyn_clk(drm_mode))
@@ -147,8 +147,8 @@ void dsi_convert_to_drm_mode(const struct dsi_display_mode *dsi_mode,
 	//	drm_mode->private_flags |= MSM_MODE_FLAG_SEAMLESS_DYNAMIC_FPS;
 	if (dsi_mode->dsi_mode_flags & DSI_MODE_FLAG_VBLANK_PRE_MODESET)
 		drm_mode->private_flags |= MSM_MODE_FLAG_VBLANK_PRE_MODESET;
-	if (dsi_mode->dsi_mode_flags & DSI_MODE_FLAG_DMS)
-		drm_mode->private_flags |= MSM_MODE_FLAG_SEAMLESS_DMS;
+	//if (dsi_mode->dsi_mode_flags & DSI_MODE_FLAG_DMS)
+	//	drm_mode->private_flags |= MSM_MODE_FLAG_SEAMLESS_DMS;
 	//if (dsi_mode->dsi_mode_flags & DSI_MODE_FLAG_VRR)
 	//	drm_mode->private_flags |= MSM_MODE_FLAG_SEAMLESS_VRR;
 	if (dsi_mode->dsi_mode_flags & DSI_MODE_FLAG_DYN_CLK)

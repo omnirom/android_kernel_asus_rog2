@@ -2308,6 +2308,8 @@ static int dsi_panel_parse_bl_config(struct dsi_panel *panel)
 	const char *data;
 	struct dsi_parser_utils *utils = &panel->utils;
 	char *bl_name;
+	/* the brightness passed to kernel is increased by a factor of xxx */
+	int brightness_scale = 4;
 
 	if (!strcmp(panel->type, "primary"))
 		bl_name = "qcom,mdss-dsi-bl-pmic-control-type";
@@ -2368,9 +2370,9 @@ static int dsi_panel_parse_bl_config(struct dsi_panel *panel)
 	if (rc) {
 		pr_debug("[%s] brigheness-max-level unspecified, defaulting to 255\n",
 			 panel->name);
-		panel->bl_config.brightness_max_level = 255;
+		panel->bl_config.brightness_max_level = brightness_scale * 255;
 	} else {
-		panel->bl_config.brightness_max_level = val;
+		panel->bl_config.brightness_max_level = brightness_scale * val;
 	}
 
 	rc = utils->read_u32(utils->data,

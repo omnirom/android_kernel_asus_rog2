@@ -448,12 +448,21 @@ static void dw791x_vibrator_work_routine(struct work_struct *work)
         val = dw791x->duration;
         if(val>0){
             //play vibration
+            DbgOut((DBL_INFO, "write tap_gamma_h1 header\n"));
+            dw791x_seq_write(dw791x->i2c, dw791x->mem_input,0x01,RAM_ADDR16,(u8*)tap_gamma_h1,5);
+            DbgOut((DBL_INFO, "write tap_gamma_pcm1 data\n"));
+            dw791x_seq_write(dw791x->i2c, dw791x->mem_input,0x027C,RAM_ADDR16,(u8*)tap_gamma_pcm1,sizeof(tap_gamma_pcm1));
+            
+            dw791x_byte_write(dw791x->i2c, dw791x->play_mode, MEM);//set memory mode
+            dw791x_byte_write(dw791x->i2c, DW7914_WAVQ1, 1);//start
+            dw791x_byte_write(dw791x->i2c, DW7914_WAVE_SEQ_LOOP0, 0x01);//1111 : Infinite loops
+            dw791x_byte_write(dw791x->i2c, DW7914_WAVQ2, 0x00);//stop
             dw791x_byte_write(dw791x->i2c, dw791x->play_back, DRV_PLAY);
             //end play
             /* run ms timer */
             if(gVibDebugLog&0x0010)//store node debug
                 DbgOut((DBL_ERROR, "%s:hrtimer_start:dw791x_vibrator_timer_func, %dms\n", __func__, val));
-            hrtimer_start(&dw791x->timer,
+                hrtimer_start(&dw791x->timer,
                       ktime_set(val / 1000, (val % 1000) * 1000000),
                       HRTIMER_MODE_REL);
         }
@@ -3915,7 +3924,7 @@ static ssize_t activate_store(struct device *dev,
     ret=kstrtouint(buf, 0, &val);
     if (val != 0 && val != 1)
         return count;
-    #if 0
+    #if 1
     if(!dw791x->duration){
         DbgOut((DBL_INFO, "%s:channel=0x%0x, activate=%d, %dms, exit\n", __func__, gChannel, val, dw791x->duration));
         //dump_stack();
@@ -3923,16 +3932,22 @@ static ssize_t activate_store(struct device *dev,
     }
     #endif
     if(val==0)
+    {
         DbgOut((DBL_INFO, "%s:channel=0x%0x,Vibrator off(%d)\n", __func__, gChannel, val));
+    }
     else
         DbgOut((DBL_INFO, "%s:channel=0x%0x, Vibrator on(%d), %dms\n", __func__, gChannel, val, dw791x->duration));
+    printk("%s:channel=0x%0x, Vibrator %s(%d), %dms\n", __func__, gChannel, (val==0)? "Off":"On",val, dw791x->duration);
     mutex_lock(&dw791x->dev_lock);
     if(val==1){
+        DbgOut((DBL_INFO, "write tap_gamma_h1 header\n"));
+        dw791x_seq_write(dw791x->i2c, dw791x->mem_input,0x01,RAM_ADDR16,(u8*)tap_gamma_h1,5);
+        DbgOut((DBL_INFO, "write tap_gamma_pcm1 data\n"));
+        dw791x_seq_write(dw791x->i2c, dw791x->mem_input,0x027C,RAM_ADDR16,(u8*)tap_gamma_pcm1,sizeof(tap_gamma_pcm1));
         dw791x_byte_write(dw791x->i2c, dw791x->play_mode, MEM);//set memory mode
         dw791x_byte_write(dw791x->i2c, DW7914_WAVQ1, 1);//start
-        dw791x_byte_write(dw791x->i2c, DW7914_WAVE_SEQ_LOOP0, 0x0F);//1111 : Infinite loops
+        dw791x_byte_write(dw791x->i2c, DW7914_WAVE_SEQ_LOOP0, 0x01);//1111 : Infinite loops
         dw791x_byte_write(dw791x->i2c, DW7914_WAVQ2, 0x00);//stop
-        //dw791x_byte_write(dw791x->i2c, DW7914_MEM_LOOP, 0x0f);//1111 : Infinite loops. Stop with trigger or GO bit
     }
     if(dw791x->state==1)
         hrtimer_cancel(&dw791x->timer);
