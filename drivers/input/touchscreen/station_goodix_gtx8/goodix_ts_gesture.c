@@ -1,8 +1,7 @@
 /*
- * Goodix GTX5 Gesture Dirver
+ * Goodix Gesture Module
  *
- * Copyright (C) 2015 - 2016 Goodix, Inc.
- * Authors:  Wang Yafei <wangyafei@goodix.com>
+ * Copyright (C) 2019 - 2020 Goodix, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -25,39 +24,38 @@
 #include <linux/platform_device.h>
 #include <linux/version.h>
 #include <linux/delay.h>
-#include <asm/atomic.h>
+#include <linux/atomic.h>
 #include "goodix_ts_core.h"
-
-#define GSX_REG_GESTURE_DATA			0x4100
-#define GSX_REG_GESTURE				0x6F68
 
 #define GSX_GESTURE_CMD				0x08
 
 #define QUERYBIT(longlong, bit) (!!(longlong[bit/8] & (1 << bit%8)))
 
+#define GSX_MAX_KEY_DATA_LEN    64
 #define GSX_KEY_DATA_LEN	37
+#define GSX_KEY_DATA_LEN_YS	41
 #define GSX_GESTURE_TYPE_LEN	32
 
 /*
  * struct gesture_module - gesture module data
  * @registered: module register state
  * @sysfs_node_created: sysfs node state
- * @gesture_type: store valied gesture type,each bit stand for a gesture
+ * @gesture_type: store valid gesture type,each bit stand for a gesture
  * @gesture_data: gesture data
  * @gesture_ts_cmd: gesture command data
-*/
+ */
 struct gesture_module {
 	atomic_t registered;
 	unsigned int kobj_initialized;
 	rwlock_t rwlock;
 	unsigned char gesture_type[GSX_GESTURE_TYPE_LEN];
-	unsigned char gesture_data[GSX_KEY_DATA_LEN];
+	unsigned char gesture_data[GSX_MAX_KEY_DATA_LEN];
 	struct goodix_ext_module module;
 	struct goodix_ts_cmd cmd;
 };
 
+static int gsx_enter_gesture_mode(struct goodix_ts_device *ts_dev);
 static struct gesture_module *gsx_gesture; /*allocated in gesture init module*/
-
 
 /**
  * gsx_gesture_type_show - show valid gesture type
@@ -87,10 +85,8 @@ static ssize_t gsx_gesture_type_show(struct goodix_ext_module *module,
 		}
 	}
 	type[count] = '\0';
-	if (count > 0) {
-		/* TODO 这里使用scnprintf需要确认一下是否有效 */
+	if (count > 0)
 		ret = scnprintf(buf, PAGE_SIZE, "%s", type);
-	}
 	read_unlock(&gsx_gesture->rwlock);
 
 	kfree(type);
@@ -127,7 +123,8 @@ static ssize_t gsx_gesture_type_store(struct goodix_ext_module *module,
 static ssize_t gsx_gesture_enable_show(struct goodix_ext_module *module,
 		char *buf)
 {
-	return scnprintf(buf, PAGE_SIZE, "%d\n", atomic_read(&gsx_gesture->registered));
+	return scnprintf(buf, PAGE_SIZE, "%d\n",
+			 atomic_read(&gsx_gesture->registered));
 }
 
 static ssize_t gsx_gesture_enable_store(struct goodix_ext_module *module,
@@ -147,7 +144,7 @@ static ssize_t gsx_gesture_enable_store(struct goodix_ext_module *module,
 			ts_debug("Gesture module has aready registered");
 			return count;
 		}
-		ret = station_goodix_register_ext_module(&gsx_gesture->module);
+		ret = goodix_register_ext_module(&gsx_gesture->module);
 		if (!ret) {
 			ts_info("Gesture module registered!");
 			atomic_set(&gsx_gesture->registered, 1);
@@ -161,7 +158,7 @@ static ssize_t gsx_gesture_enable_store(struct goodix_ext_module *module,
 			return count;
 		}
 		ts_debug("Start unregistered gesture module");
-		ret = station_goodix_unregister_ext_module(&gsx_gesture->module);
+		ret = goodix_unregister_ext_module(&gsx_gesture->module);
 		if (!ret) {
 			atomic_set(&gsx_gesture->registered, 0);
 			ts_info("Gesture module unregistered success");
@@ -176,37 +173,10 @@ static ssize_t gsx_gesture_enable_store(struct goodix_ext_module *module,
 	return count;
 }
 
-/**
- * gsx_gesture_data_show - show gesture data read frome IC
- *
- * @module: pointer to goodix_ext_module struct
- * @buf: pointer to output buffer
- * Returns >0 - gesture data length,< 0 - failed
- */
-/*static ssize_t gsx_gesture_data_show(struct goodix_ext_module *module,
-				char *buf)
-{
-	int count = GSX_KEY_DATA_LEN;
-
-	if (atomic_read(&gsx_gesture->registered) != 1) {
-		ts_info("Gesture module not register!");
-		return -EPERM;
-	}
-	if (!buf || !gsx_gesture->gesture_data) {
-		ts_info("Parameter error!");
-		return -EPERM;
-	}
-	read_lock(&gsx_gesture->rwlock);
-	memcpy(buf, gsx_gesture->gesture_data, count);
-	read_unlock(&gsx_gesture->rwlock);
-
-	return count;
-}*/
-
 static ssize_t gsx_gesture_data_show(struct goodix_ext_module *module,
 				char *buf)
 {
-	int count = GSX_KEY_DATA_LEN;
+	ssize_t count;
 
 	if (atomic_read(&gsx_gesture->registered) != 1) {
 		ts_info("Gesture module not register!");
@@ -233,10 +203,40 @@ const struct goodix_ext_attribute gesture_attrs[] = {
 	__EXTMOD_ATTR(data, 0444, gsx_gesture_data_show, NULL)
 };
 
+static int gsx_enter_gesture_mode(struct goodix_ts_device *ts_dev)
+{
+	if (!gsx_gesture->cmd.initialized) {
+		if (!ts_dev->reg.command) {
+			ts_err("command reg can not be null");
+			return -EINVAL;
+		}
+		if (ts_dev->ic_type == IC_TYPE_YELLOWSTONE) {
+			gsx_gesture->cmd.cmd_reg = ts_dev->reg.command;
+			gsx_gesture->cmd.length = 5;
+			gsx_gesture->cmd.cmds[0] = GSX_GESTURE_CMD;
+			gsx_gesture->cmd.cmds[1] = 0x0;
+			gsx_gesture->cmd.cmds[2] = 0x0;
+			gsx_gesture->cmd.cmds[3] = 0x0;
+			gsx_gesture->cmd.cmds[4] = GSX_GESTURE_CMD;
+			gsx_gesture->cmd.initialized = 1;
+
+		} else {
+			gsx_gesture->cmd.cmd_reg = ts_dev->reg.command;
+			gsx_gesture->cmd.length = 3;
+			gsx_gesture->cmd.cmds[0] = GSX_GESTURE_CMD;
+			gsx_gesture->cmd.cmds[1] = 0x0;
+			gsx_gesture->cmd.cmds[2] = 0 - GSX_GESTURE_CMD;
+			gsx_gesture->cmd.initialized = 1;
+		}
+	}
+
+	return ts_dev->hw_ops->send_cmd(ts_dev, &gsx_gesture->cmd);
+}
+
 static int gsx_gesture_init(struct goodix_ts_core *core_data,
 		struct goodix_ext_module *module)
 {
-	int i, ret;
+	int i, ret = -EINVAL;
 	struct goodix_ts_device *ts_dev = core_data->ts_dev;
 
 	if (!core_data || !ts_dev->hw_ops->write || !ts_dev->hw_ops->read) {
@@ -244,28 +244,20 @@ static int gsx_gesture_init(struct goodix_ts_core *core_data,
 		goto exit_gesture_init;
 	}
 
-	gsx_gesture->cmd.cmd_reg = GSX_REG_GESTURE;
-	gsx_gesture->cmd.length = 3;
-	gsx_gesture->cmd.cmds[0] = GSX_GESTURE_CMD;
-	gsx_gesture->cmd.cmds[1] = 0x0;
-	gsx_gesture->cmd.cmds[2] = 0 - GSX_GESTURE_CMD;
-	gsx_gesture->cmd.initialized = 1;
-
 	memset(gsx_gesture->gesture_type, 0, GSX_GESTURE_TYPE_LEN);
-	memset(gsx_gesture->gesture_data, 0xff, GSX_KEY_DATA_LEN);
+	memset(gsx_gesture->gesture_data, 0xff,
+	       sizeof(gsx_gesture->gesture_data));
 
 	ts_debug("Set gesture type manually");
+	/* set all bit to 1 to enable all gesture wakeup */
 	memset(gsx_gesture->gesture_type, 0xff, GSX_GESTURE_TYPE_LEN);
-	/*gsx_gesture->gesture_type[34/8] |= (0x1 << 34%8);*/	/* 0x22 double click */
-	/*gsx_gesture->gesture_type[170/8] |= (0x1 << 170%8);*/	/* 0xaa up swip */
-	/*gsx_gesture->gesture_type[187/8] |= (0x1 << 187%8);*/	/* 0xbb right swip */
-	/*gsx_gesture->gesture_type[171/8] |= (0x1 << 171%8);*/	/* 0xab down swip */
-	/*gsx_gesture->gesture_type[186/8] |= (0x1 << 186%8);*/	/* 0xba left swip */
 
-	if (gsx_gesture->kobj_initialized)
+	if (gsx_gesture->kobj_initialized) {
+		ret = 0;
 		goto exit_gesture_init;
+	}
 
-	ret = kobject_init_and_add(&module->kobj, station_goodix_get_default_ktype(),
+	ret = kobject_init_and_add(&module->kobj, goodix_get_default_ktype(),
 			&core_data->pdev->dev.kobj, "gesture");
 
 	if (ret) {
@@ -273,74 +265,30 @@ static int gsx_gesture_init(struct goodix_ts_core *core_data,
 		goto exit_gesture_init;
 	}
 
-	for (i = 0; i < sizeof(gesture_attrs)/sizeof(gesture_attrs[0]); i++) {
-		if (sysfs_create_file(&module->kobj,
-				&gesture_attrs[i].attr)) {
-			ts_err("Create sysfs attr file error");
-			kobject_put(&module->kobj);
-			goto exit_gesture_init;
-		}
+	ret = 0;
+	for (i = 0; i < ARRAY_SIZE(gesture_attrs) && !ret; i++)
+		ret = sysfs_create_file(&module->kobj, &gesture_attrs[i].attr);
+	if (ret) {
+		ts_err("failed create gst sysfs files");
+		while (--i >= 0)
+			sysfs_remove_file(&module->kobj, &gesture_attrs[i].attr);
+
+		kobject_put(&module->kobj);
+		goto exit_gesture_init;
 	}
+
 	gsx_gesture->kobj_initialized = 1;
 
 exit_gesture_init:
-	return 0;
+	return ret;
 }
+
 static int gsx_gesture_exit(struct goodix_ts_core *core_data,
 		struct goodix_ext_module *module)
 {
-	/*if (gsx_gesture->kobj_initialized)
-		kobject_put(&module->kobj);
-	gsx_gesture->kobj_initialized = 0;*/
 	atomic_set(&gsx_gesture->registered, 0);
 	return 0;
 }
-
-#if 0
-static void report_gesture_key(struct input_dev *dev, char keycode)
-{
-	switch (keycode) {
-	case 0x11: /* click */
-		input_report_key(dev, KEY_F7, 1);
-		input_sync(dev);
-		input_report_key(dev, KEY_F7, 0);
-		input_sync(dev);
-		break;
-	case 0x22: /* double click */
-		input_report_key(dev, KEY_F6, 1);
-		input_sync(dev);
-		input_report_key(dev, KEY_F6, 0);
-		input_sync(dev);
-		break;
-	case 0xaa: /* up swip */
-		input_report_key(dev, KEY_F2, 1);
-		input_sync(dev);
-		input_report_key(dev, KEY_F2, 0);
-		input_sync(dev);
-		break;
-	case 0xbb: /* right swip */
-		input_report_key(dev, KEY_F5, 1);
-		input_sync(dev);
-		input_report_key(dev, KEY_F5, 0);
-		input_sync(dev);
-		break;
-	case 0xab: /* down swip */
-		input_report_key(dev, KEY_F3, 1);
-		input_sync(dev);
-		input_report_key(dev, KEY_F3, 0);
-		input_sync(dev);
-		break;
-	case 0xba: /* left swip */
-		input_report_key(dev, KEY_F4, 1);
-		input_sync(dev);
-		input_report_key(dev, KEY_F4, 0);
-		input_sync(dev);
-		break;
-	default:
-		break;
-	}
-}
-#endif
 
 /**
  * gsx_gesture_ist - Gesture Irq handle
@@ -355,28 +303,40 @@ static int gsx_gesture_ist(struct goodix_ts_core *core_data,
 	struct goodix_ext_module *module)
 {
 	int ret;
-	unsigned char clear_reg = 0;
-	unsigned char checksum = 0, temp_data[GSX_KEY_DATA_LEN];
+	int key_data_len = 0;
+	u8 clear_reg = 0, checksum = 0, gsx_type = 0;
+	u8 temp_data[GSX_MAX_KEY_DATA_LEN];
 	struct goodix_ts_device *ts_dev = core_data->ts_dev;
-	struct goodix_ts_cmd *gesture_cmd = &gsx_gesture->cmd;
 
-	/*ts_debug("gsx_gesture_ist, core_data-suspend=%d",
-			atomic_read(&core_data->suspended));*/
 	if (atomic_read(&core_data->suspended) == 0)
 		return EVT_CONTINUE;
 
-		/* get ic gesture state*/
-	ret = ts_dev->hw_ops->read_trans(core_data->ts_dev, GSX_REG_GESTURE_DATA,
-				   temp_data, sizeof(temp_data));
+	if (!ts_dev->reg.gesture) {
+		ts_err("gesture reg can't be null");
+		return EVT_CONTINUE;
+	}
+	/* get ic gesture state*/
+	if (ts_dev->ic_type == IC_TYPE_YELLOWSTONE)
+		key_data_len = GSX_KEY_DATA_LEN_YS;
+	else
+		key_data_len = GSX_KEY_DATA_LEN;
+
+	ret = ts_dev->hw_ops->read_trans(ts_dev, ts_dev->reg.gesture,
+					 temp_data, key_data_len);
 	if (ret < 0 || ((temp_data[0] & GOODIX_GESTURE_EVENT)  == 0)) {
-		ts_debug("Read gesture data faild, ret=%d, temp_data[0]=0x%x", ret, temp_data[0]);
+		ts_debug("invalid gesture event, ret=%d, temp_data[0]=0x%x",
+			 ret, temp_data[0]);
 		goto re_send_ges_cmd;
 	}
 
-	checksum = checksum_u8(temp_data, sizeof(temp_data));
-	if (checksum != 0) {
+	if (ts_dev->ic_type == IC_TYPE_YELLOWSTONE)
+		checksum = checksum_u8_ys(temp_data, key_data_len);
+	else
+		checksum = checksum_u8(temp_data, key_data_len);
+	if (checksum) {
 		ts_err("Gesture data checksum error:0x%x", checksum);
-		ts_info("Gesture data %*ph", (int)sizeof(temp_data), temp_data);
+		ts_info("Gesture data %*ph",
+			(int)sizeof(temp_data), temp_data);
 		goto re_send_ges_cmd;
 	}
 
@@ -385,10 +345,15 @@ static int gsx_gesture_ist(struct goodix_ts_core *core_data,
 		 temp_data[2], temp_data[3]);
 
 	write_lock(&gsx_gesture->rwlock);
-	memcpy(gsx_gesture->gesture_data, temp_data, sizeof(temp_data));
+	memcpy(gsx_gesture->gesture_data, temp_data, key_data_len);
 	write_unlock(&gsx_gesture->rwlock);
 
-	if (QUERYBIT(gsx_gesture->gesture_type, temp_data[2])) {
+	if (ts_dev->ic_type == IC_TYPE_YELLOWSTONE)
+		gsx_type = temp_data[3];
+	else
+		gsx_type = temp_data[2];
+
+	if (QUERYBIT(gsx_gesture->gesture_type, gsx_type)) {
 		/* do resume routine */
 		ts_info("Gesture match success, resume IC");
 		input_report_key(core_data->input_dev, KEY_WAKEUP, 1);
@@ -401,11 +366,11 @@ static int gsx_gesture_ist(struct goodix_ts_core *core_data,
 	}
 
 re_send_ges_cmd:
-	if (ts_dev->hw_ops->send_cmd(core_data->ts_dev, gesture_cmd))
+	if (gsx_enter_gesture_mode(core_data->ts_dev))
 		ts_info("warning: failed re_send gesture cmd\n");
 gesture_ist_exit:
-	ts_dev->hw_ops->write_trans(core_data->ts_dev, GSX_REG_GESTURE_DATA,
-			      &clear_reg, 1);
+	ts_dev->hw_ops->write_trans(ts_dev, ts_dev->reg.gesture,
+				    &clear_reg, 1);
 	return EVT_CANCEL_IRQEVT;
 }
 
@@ -429,44 +394,15 @@ static int gsx_gesture_before_suspend(struct goodix_ts_core *core_data,
 		return 0;
 	}
 
-	/*for (i = 0; i <  GOODIX_BUS_RETRY_TIMES; i++) {
-
-		ret = hw_ops->send_cmd(core_data->ts_dev, gesture_cmd);
-		if (!ret) {
-			ts_info("Set IC in doze mode");
-			ret = 0;
-			break;
-		}
-		usleep_range(5000, 5010);
-	}*/
-	ret = hw_ops->send_cmd(core_data->ts_dev, gesture_cmd);
+	ret = gsx_enter_gesture_mode(core_data->ts_dev);
 	if (ret != 0) {
-		ts_err("Send doze command error");
+		ts_err("failed enter gesture mode");
 		return 0;
-	} else {
-		ts_info("Set IC in doze mode");
-		atomic_set(&core_data->suspended, 1);
-		return EVT_CANCEL_SUSPEND;
 	}
+	ts_info("Set IC in gesture mode");
+	atomic_set(&core_data->suspended, 1);
+	return EVT_CANCEL_SUSPEND;
 }
-
-/**
- * gsx_gesture_before_resume - execute gesture resume routine
- * This functions is excuted to make ic out doze mode
- *
- * @core_data: pointer to touch core data
- * @module: pointer to goodix_ext_module struct
- * return: 0 goon execute, EVT_CANCLED  stop execute
- *
-static int gsx_gesture_before_resume(struct goodix_ts_core *core_data,
-			struct goodix_ext_module *module)
-{
-	struct goodix_ts_device *ts_dev = core_data->ts_dev;
-
-	ts_dev->hw_ops->reset(ts_dev);
-	return 0;
-}
-*/
 
 static struct goodix_ext_module_funcs gsx_gesture_funcs = {
 	.irq_event = gsx_gesture_ist,
@@ -477,7 +413,7 @@ static struct goodix_ext_module_funcs gsx_gesture_funcs = {
 
 static int __init goodix_gsx_gesture_init(void)
 {
-	/* initialize core_data->ts_dev->gesture_cmd*/
+	/* initialize core_data->ts_dev->gesture_cmd */
 	int result;
 	ts_info("gesture module init");
 	gsx_gesture = kzalloc(sizeof(struct gesture_module), GFP_KERNEL);
@@ -490,7 +426,7 @@ static int __init goodix_gsx_gesture_init(void)
 	gsx_gesture->kobj_initialized = 0;
 	atomic_set(&gsx_gesture->registered, 0);
 	rwlock_init(&gsx_gesture->rwlock);
-	result = station_goodix_register_ext_module(&(gsx_gesture->module));
+	result = goodix_register_ext_module(&(gsx_gesture->module));
 	if (result == 0)
 		atomic_set(&gsx_gesture->registered, 1);
 
@@ -499,11 +435,21 @@ static int __init goodix_gsx_gesture_init(void)
 
 static void __exit goodix_gsx_gesture_exit(void)
 {
+	int i, ret;
 	ts_info("gesture module exit");
-	if (gsx_gesture->kobj_initialized)
+	if (atomic_read(&gsx_gesture->registered)) {
+		ret = goodix_unregister_ext_module(&gsx_gesture->module);
+		atomic_set(&gsx_gesture->registered, 0);
+	}
+	if (gsx_gesture->kobj_initialized) {
+		for (i = 0; i < ARRAY_SIZE(gesture_attrs); i++)
+			sysfs_remove_file(&gsx_gesture->module.kobj,
+					  &gesture_attrs[i].attr);
+
 		kobject_put(&gsx_gesture->module.kobj);
+	}
+
 	kfree(gsx_gesture);
-	return;
 }
 
 module_init(goodix_gsx_gesture_init);

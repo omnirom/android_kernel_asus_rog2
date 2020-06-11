@@ -32,6 +32,9 @@ extern bool g_Charger_mode;
 // BSP SZ --- Lydia_Wu add for Station display
 char asus_gpio = 0;
 
+// For Station HWID
+extern int Station_HWID;
+
 /************************************************************************
 * Name: ec_i2c_write
 * Brief: i2c write
@@ -735,22 +738,48 @@ static ssize_t model_name_show(struct device *dev,
 	return snprintf(buf, PAGE_SIZE,"%s\n", &buffer[1]);
 }
 
-static ssize_t hw_id_show(struct device *dev,
-					 struct device_attribute *mattr,
-					 char *buf)
+static int i2c_get_station_hwid(void)
 {
 	int ret = 0;
 	char buffer[3] = {0};
 	char cmd = 0;
 
+	if (EC_FW_VER < 535) {
+		printk("[EC_I2C] EC FW %d is too old, set Station HWID as ROG_Station2\n", EC_FW_VER);
+		Station_HWID = ROG_Station2;
+		return 0;
+	}
+
 	cmd = CMD_I2C_GET_HW_ID;
 	
 	ret = ec_i2c_read(ec_i2c_data->client,&cmd,1,buffer,3);
-	if (ret < 0)
+	if (ret < 0) {
+		printk("[EC_I2C] I2C not connect, get HWID fail\n");
+		Station_HWID = 255;
+		return -1;
+	}
+
+	if ( (buffer[1] == 1) && (buffer[2] == 1) )
+		Station_HWID = ROG_Station2;
+	else if ( (buffer[1] == 1) && (buffer[2] == 0) )
+		Station_HWID = ROG_Station3;
+	else if ( (buffer[1] == 0) && (buffer[2] == 1) )
+		Station_HWID = ROG_Station3;
+	else
+		Station_HWID = ROG_Station_other;
+
+	printk("[EC_I2C] GPIO status : %#x, %#x, Station HWID = %#x\n", buffer[1], buffer[2], Station_HWID);
+	return 0;
+}
+
+static ssize_t hw_id_show(struct device *dev,
+					 struct device_attribute *mattr,
+					 char *buf)
+{
+	if (i2c_get_station_hwid() < 0)
 		return sprintf(buf, "%s\n", "I2C not connect");
 
-	printk("[EC_I2C] hw_id_show : 0x%x, 0x%x\n", buffer[1],buffer[2]);
-	return snprintf(buf, PAGE_SIZE,"%x%x\n", buffer[1],buffer[2]);
+	return snprintf(buf, PAGE_SIZE,"%#x\n", Station_HWID);
 }
 
 static ssize_t ec_ssn_show(struct device *dev,
@@ -1351,25 +1380,35 @@ static ssize_t pwm_store(struct device *dev,
 	return count;
 }
 
-static ssize_t fw_ver_show(struct device *dev,
-					 struct device_attribute *mattr,
-					 char *buf)
+int get_ec_fw_ver(void)
 {
 	int ret = 0;
 	char buffer[4] = {0};
 	char cmd = 0;
 
 	cmd = CMD_I2C_GET_EC_FW_Version;
-
-	printk("[EC_I2C] fw_ver_show\n");
-
-
 	ret = ec_i2c_read(ec_i2c_data->client,&cmd,1,buffer,4);
+	if (ret < 0) {
+		printk("[EC_I2C] CMD_I2C_GET_EC_FW_Version I2C error!!!\n");
+		return ret;
+	}
 
-	printk("[EC_I2C] FW_VER : %c%c%c\n", buffer[1], buffer[2], buffer[3]);
+	sscanf((buffer+1), "%d", &EC_FW_VER);
+	printk("[EC_I2C] EC_FW_VER: %d\n", EC_FW_VER);
+	return ret;
+}
 
+static ssize_t fw_ver_show(struct device *dev,
+					 struct device_attribute *mattr,
+					 char *buf)
+{
+	int ret = 0;
 
-	return snprintf(buf, PAGE_SIZE,"%c%c%c\n", buffer[1], buffer[2], buffer[3]);
+	ret = get_ec_fw_ver();
+	if (ret < 0)
+		return sprintf(buf, "%s\n", "I2C not connect");
+
+	return snprintf(buf, PAGE_SIZE,"%d\n", EC_FW_VER);
 }
 
 static ssize_t get_gpio_store(struct device *dev,
@@ -1643,6 +1682,9 @@ static int ec_i2c_remove(struct i2c_client *client)
 	gEC_init = 0;
 	station_shutdown = false;
 
+	Station_HWID = ROG_Station_none;
+	printk("[EC_I2C] Clean Station HWID as %#x !\n", ROG_Station_none);
+
 	complete_all(&hid_state);
 	msleep(50);
 	reinit_completion(&hid_state);
@@ -1776,6 +1818,9 @@ static int ec_i2c_probe(struct i2c_client *client, const struct i2c_device_id *i
 	ec_fw_ver.i2c_get_ec_fw_ver = i2c_get_ec_fw_ver;
 
 	mutex_unlock(&ec_i2c_func_mutex);
+
+	get_ec_fw_ver();
+	i2c_get_station_hwid();
 
 	asus_hid_is_connected();
 

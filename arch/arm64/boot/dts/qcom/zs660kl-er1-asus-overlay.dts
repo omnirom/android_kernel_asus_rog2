@@ -345,11 +345,11 @@
 		goodix,panel-key-map = <158 172 217>; /*KEY_BACK, KEY_HOMEPAGE, KEY_SEARCH*/
 		goodix,power-on-delay-us = <300000>; /*300ms*/
 		goodix,power-off-delay-us = <5000>;
-		/*goodix,swap-axis;*/
+		/*goodix,swap-axis;
 		goodix,x2x;
 		goodix,y2y;
 		goodix,pen-enable;
-		goodix,key-of-pen = <331 332>;/*BTN_STYLUS, BTN_STYLUS2*/
+		goodix,key-of-pen = <331 332>;*//*BTN_STYLUS, BTN_STYLUS2*/
 		sensor0 {
 		    normal-cfg = [];
 		};

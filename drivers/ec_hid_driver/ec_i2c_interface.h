@@ -73,5 +73,15 @@ extern bool station_shutdown;
 
 struct class *ec_i2c_class;
 static DEFINE_MUTEX(i2c_rw_access);
+static int EC_FW_VER;
+
+enum asus_station_HWID
+{
+	ROG_Station_none = 0,
+	ROG_Station1 = 1,
+	ROG_Station2 = 2,
+	ROG_Station3 = 3,
+	ROG_Station_other = 255,
+};
 
 #endif

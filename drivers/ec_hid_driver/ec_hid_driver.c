@@ -101,6 +101,9 @@ EXPORT_SYMBOL(ec_i2c_ultra_mode);
 int ec_i2c_driver_state = 0;
 EXPORT_SYMBOL(ec_i2c_driver_state);
 
+int Station_HWID = 0;
+EXPORT_SYMBOL(Station_HWID);
+
 extern int lastFps;
 extern bool g_Charger_mode;
 

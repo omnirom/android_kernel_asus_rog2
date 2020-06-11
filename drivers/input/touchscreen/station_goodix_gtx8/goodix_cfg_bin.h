@@ -3,7 +3,14 @@
 
 #include "goodix_ts_core.h"
 
-#define TS_DEFAULT_CFG_BIN "goodix_cfg_group_station.bin"
+// ASUS_BSP +++ Touch
+#define TS_9886_CFG_BIN "goodix_cfg_group_station.bin"
+#define TS_9896_CFG_BIN "goodix_cfg_station_9896.bin"
+
+
+#define TS_9886_GESTURE_ADDR 0x4100
+#define TS_9896_GESTURE_ADDR 0x4180
+// ASUS_BSP --- Touch
 #define TS_BIN_VERSION_START_INDEX	5
 #define TS_BIN_VERSION_LEN	4
 #define TS_CFG_BIN_HEAD_RESERVED_LEN	6
@@ -88,20 +95,5 @@ struct goodix_cfg_bin {
 	struct goodix_cfg_bin_head head;
 	struct goodix_cfg_package *cfg_pkgs;
 };
-
-
-int goodix_cfg_bin_proc(void *data);
-
-int goodix_parse_cfg_bin(struct goodix_cfg_bin *cfg_bin);
-
-int goodix_get_reg_and_cfg(struct goodix_ts_device *ts_dev, struct goodix_cfg_bin *cfg_bin);
-
-int goodix_read_cfg_bin(struct device *dev, struct goodix_cfg_bin *cfg_bin);
-
-int goodix_read_cfg_bin_from_dts(struct device_node *node, struct goodix_cfg_bin *cfg_bin);
-
-void goodix_cfg_pkg_leToCpu(struct goodix_cfg_package *pkg);
-
-int goodix_start_cfg_bin(struct goodix_ts_core *ts_core);
 
 #endif

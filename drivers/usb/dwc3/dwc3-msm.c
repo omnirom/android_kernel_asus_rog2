@@ -1840,19 +1840,6 @@ static int msm_dwc3_usbdev_notify(struct notifier_block *self,
 	mdwc->hc_died = true;
 
 	pr_info("[USB] %s DongleType = %d\n", __func__, gDongleType);
-	//Others device need DP disonnect/connect, DT didn't.
-	if (gDongleType != 3 && g_hpd) {
-
-		if (gDongleType == 2)
-			asus_dp_change_state(0,0);
-		else
-			asus_dp_disconnect();
-
-		if (!wait_for_completion_timeout(&dp_stop_comp, HZ * 5))
-			pr_info("[USB] %s dp disconnect timeout 5secs\n", __func__);
-
-		dp_need_restart = true;
-	}
 
 	queue_delayed_work(mdwc->sm_usb_wq, &mdwc->sm_work, 0);
 	return 0;
@@ -4438,6 +4425,16 @@ static int dwc3_otg_start_host(struct dwc3_msm *mdwc, int on)
 		}
 
 	} else {
+		if (mdwc->hc_died && gDongleType != 3 && g_hpd) {
+			dev_info(mdwc->dev, "[USB] %s: hc_die, call asus_dp\n", __func__);
+			if (gDongleType == 2)
+				asus_dp_change_state(0,0);
+			else
+				asus_dp_disconnect();
+			if (!wait_for_completion_timeout(&dp_stop_comp, HZ * 5))
+				pr_err("[USB] %s dp disconnect timeout 5secs\n", __func__);
+			dp_need_restart = true;
+		}
 		dev_info(mdwc->dev, "[USB] %s: turn off host\n", __func__);
 
 		if (!strcmp("a600000.ssusb", dev_name(mdwc->dev))) {
