@@ -452,10 +452,10 @@ static void dw791x_vibrator_work_routine(struct work_struct *work)
             dw791x_seq_write(dw791x->i2c, dw791x->mem_input,0x01,RAM_ADDR16,(u8*)tap_gamma_h1,5);
             DbgOut((DBL_INFO, "write tap_gamma_pcm1 data\n"));
             dw791x_seq_write(dw791x->i2c, dw791x->mem_input,0x027C,RAM_ADDR16,(u8*)tap_gamma_pcm1,sizeof(tap_gamma_pcm1));
-            
+
             dw791x_byte_write(dw791x->i2c, dw791x->play_mode, MEM);//set memory mode
             dw791x_byte_write(dw791x->i2c, DW7914_WAVQ1, 1);//start
-            dw791x_byte_write(dw791x->i2c, DW7914_WAVE_SEQ_LOOP0, 0x01);//1111 : Infinite loops
+            dw791x_byte_write(dw791x->i2c, DW7914_WAVE_SEQ_LOOP0, 0x0F);//1111 : Infinite loops
             dw791x_byte_write(dw791x->i2c, DW7914_WAVQ2, 0x00);//stop
             dw791x_byte_write(dw791x->i2c, dw791x->play_back, DRV_PLAY);
             //end play
@@ -3946,7 +3946,7 @@ static ssize_t activate_store(struct device *dev,
         dw791x_seq_write(dw791x->i2c, dw791x->mem_input,0x027C,RAM_ADDR16,(u8*)tap_gamma_pcm1,sizeof(tap_gamma_pcm1));
         dw791x_byte_write(dw791x->i2c, dw791x->play_mode, MEM);//set memory mode
         dw791x_byte_write(dw791x->i2c, DW7914_WAVQ1, 1);//start
-        dw791x_byte_write(dw791x->i2c, DW7914_WAVE_SEQ_LOOP0, 0x01);//1111 : Infinite loops
+        dw791x_byte_write(dw791x->i2c, DW7914_WAVE_SEQ_LOOP0, 0x0F);//1111 : Infinite loops
         dw791x_byte_write(dw791x->i2c, DW7914_WAVQ2, 0x00);//stop
     }
     if(dw791x->state==1)
