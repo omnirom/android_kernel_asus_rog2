@@ -917,10 +917,13 @@ static int goodix_update_finish(struct goodix_ts_device *ts_dev,
 		ts_err("Failed to run ss51");
 
 	/*reset*/
+/*
 	gpio_direction_output(ts_dev->board_data.reset_gpio, 0);
 	udelay(2000);
 	gpio_direction_output(ts_dev->board_data.reset_gpio, 1);
 	msleep(80);
+*/
+	r = ts_dev->hw_ops->reset(ts_dev);
 
 	for (i = 0; ts_dev->ic_type == IC_TYPE_YELLOWSTONE && i < 100; i++) {
 		reg_val[0] = 0x00;

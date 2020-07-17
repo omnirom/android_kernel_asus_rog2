@@ -877,7 +877,7 @@ static ssize_t keymapping_touch_store(struct device *dev,
 				      struct device_attribute *attr, const char *buf, size_t count)
 {
     int id, action, x, y, random, minus;
-    //printk("keymapping cmd buf: %s len=%d\n", buf, count);
+    ts_info("keymapping cmd buf: %s len=%d\n", buf, count);
 
 
 	if (count != 14) {
@@ -908,7 +908,7 @@ static ssize_t airtrigger_touch_store(struct device *dev,
 				      struct device_attribute *attr, const char *buf, size_t count)
 {
     int action, x, y;
-    printk("keymapping airtrigger cmd buf: %s len=%d\n", buf, count);
+    ts_info("keymapping airtrigger cmd buf: %s len=%d\n", buf, count);
 
     if(count != 19)
         return -EINVAL;
@@ -931,7 +931,7 @@ static ssize_t airtrigger_touch_store(struct device *dev,
         core_data->atr_enable = false;
         input_report_key(core_data->input_dev, BTN_TOUCH, 0);
         input_sync(core_data->input_dev);
-        printk("keymapping all buttons up\n");
+        ts_info("keymapping all buttons up\n");
         return count;
     }
 
@@ -941,7 +941,7 @@ static ssize_t airtrigger_touch_store(struct device *dev,
         x =  shex_to_u16(buf + 10, 4);
         y =  shex_to_u16(buf + 14, 4);
         ATR_touch_new(dev, 11, action,  x,  y, 0);
-        printk("keymapping airtrigger R %d %d, %d\n", action, x, y, 0);
+        ts_info("keymapping airtrigger R %d %d, %d\n", action, x, y, 0);
         LastATR = action;
     }
     action = buf[0] - '0'; // handle L
@@ -950,7 +950,7 @@ static ssize_t airtrigger_touch_store(struct device *dev,
         x =  shex_to_u16(buf + 2, 4);
         y =  shex_to_u16(buf + 6, 4);
         ATR_touch_new(dev, 12, action,  x,  y, 0);
-        printk("keymapping airtrigger L %d %d, %d\n", action, x, y, 0);
+        ts_info("keymapping airtrigger L %d %d, %d\n", action, x, y, 0);
         LastATL = action;
     }
 
@@ -984,7 +984,7 @@ static ssize_t glove_mode_store(struct device *dev,
         ts_info("glove mode enable %d",en);
 	
 	if (!allow_hw_reset){
-	  printk("FW is updating , not allow reset");
+	  ts_info("FW is updating , not allow reset");
 	  return -EINVAL;
 	}  
 
@@ -1993,7 +1993,7 @@ static int goodix_ts_input_report(struct input_dev *dev,
 }
 void ATR_touch_new(struct device *dev, int id,int action, int x, int y, int random)
 {
-    static int random_x = -1, random_y = -1, random_pressure = -10, random_major = -1;
+    static int random_x = -5, random_y = -5, random_pressure = -20, random_major = -5;
     struct goodix_ts_core *core_data = dev_get_drvdata(dev);
 	struct input_dev *input_dev = core_data->input_dev;
     int first_empty_slot = -1;
@@ -2080,10 +2080,10 @@ void ATR_touch_new(struct device *dev, int id,int action, int x, int y, int rand
             input_sync(input_dev);
         }
     } 
-    random_x += 1; if(random_x > 2) random_x = -1;
-    random_y += 1; if(random_y > 2) random_y = -1;
-    random_pressure += 5; if(random_pressure > 10) random_pressure = -5;
-    random_major += 1; if(random_major > 2) random_major = -1;
+    random_x += 1; if(random_x > 5) random_x = -1;
+    random_y += 1; if(random_y > 5) random_y = -1;
+    random_pressure += 1; if(random_pressure > 20) random_pressure = -1;
+    random_major += 1; if(random_major > 5) random_major = -1;
     
     mutex_unlock(&input_dev->mutex);
 }

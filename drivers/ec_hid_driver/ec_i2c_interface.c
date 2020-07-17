@@ -742,6 +742,7 @@ static int i2c_get_station_hwid(void)
 {
 	int ret = 0;
 	char buffer[3] = {0};
+	char model_name[12] = {0};
 	char cmd = 0;
 
 	if (EC_FW_VER < 535) {
@@ -764,11 +765,25 @@ static int i2c_get_station_hwid(void)
 	else if ( (buffer[1] == 1) && (buffer[2] == 0) )
 		Station_HWID = ROG_Station3;
 	else if ( (buffer[1] == 0) && (buffer[2] == 1) )
-		Station_HWID = ROG_Station3;
+	{
+		printk("[EC_I2C] use model name to check station hwid\n");
+
+		cmd = CMD_I2C_GET_MODEL_NAME;
+		ret = ec_i2c_read(ec_i2c_data->client,&cmd,1,model_name,12);
+		if (ret < 0)
+			printk("[EC_I2C] I2C not connect\n");
+
+		printk("[EC_I2C] model name = %s\n", &model_name[1]);
+
+		if (strncmp(&model_name[1], "ZS660KLS", 8) != 0)
+			Station_HWID = ROG_Station3;
+		else
+			Station_HWID = ROG_Station2;
+	}
 	else
 		Station_HWID = ROG_Station_other;
 
-	printk("[EC_I2C] GPIO status : %#x, %#x, Station HWID = %#x\n", buffer[1], buffer[2], Station_HWID);
+	printk("[EC_I2C] GPIO status : %#x, %#x, Station HWID = %#x, model name = %s\n", buffer[1], buffer[2], Station_HWID, &model_name[1]);
 	return 0;
 }
 

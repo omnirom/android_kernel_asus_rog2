@@ -3563,7 +3563,7 @@ static ssize_t rtp_play_repeat_store(struct device *dev,
 	if(!buf) return -1;
 	sscanf(buf, "%d %d %d", &channel, &val, &repeat);
     
-	//if(gVibDebugLog&0x0010)//store node debug
+	if(gVibDebugLog&0x0010)//store node debug
 		DbgOut((DBL_INFO, "%s:(1) channel=%d, num=%d, repeat=%d +++\n", __func__, channel, val, repeat));   
 	if(repeat<0 || repeat > 65535) repeat=1;
 	if(val<=0 || val>=65535) val=1;
@@ -3583,12 +3583,13 @@ static ssize_t rtp_play_repeat_store(struct device *dev,
     }
     //stop old vibration and then play new one.
     if(dw791x->fw!=NULL){
-        DbgOut((DBL_ERROR, "%s:(2-1) bin_num=%d, set bRTP_Play_Break=true\n", __func__, val));
+        if(gVibDebugLog&0x0010)//store node debug
+            DbgOut((DBL_ERROR, "%s:(2-1) bin_num=%d, set bRTP_Play_Break=true\n", __func__, val));
         dw791x->bRTP_Play_Break=true;
     }
     if(dw791x->bRTP_Play_Break)
     {
-        //if(gVibDebugLog&0x0010)//store node debug
+        if(gVibDebugLog&0x0010)//store node debug
             DbgOut((DBL_ERROR, "%s:(2-2) bin_num=%d, break=%d, cancel_work_sync!\n", __func__, val, dw791x->bRTP_Play_Break));
         cancel_work_sync(&dw791x->rtp_work);
         #if 1
@@ -3600,17 +3601,17 @@ static ssize_t rtp_play_repeat_store(struct device *dev,
         }
         #endif
         dw791x->bRTP_Play_Break=false;
-        //if(gVibDebugLog&0x0010)//store node debug
+        if(gVibDebugLog&0x0010)//store node debug
             DbgOut((DBL_ERROR, "%s:(2-4) bin_num=%d, break=%d, cancel_work_sync!\n", __func__, val, dw791x->bRTP_Play_Break));
     }
     //end
     dw791x->bin_num=val;
     sprintf(dw791x->fwName, "%d.bin", dw791x->bin_num);
     dw791x->repeat=repeat;
-    //if(gVibDebugLog&0x0010)//store node debug
+    if(gVibDebugLog&0x0010)//store node debug
         DbgOut((DBL_INFO, "%s:(3) bin_num=%d, fwName=%s, repeat=%d, break=%d, request_firmware...\n", __func__, dw791x->bin_num, dw791x->fwName, repeat, dw791x->bRTP_Play_Break));
     if(request_firmware(&dw791x->fw, dw791x->fwName, &dw791x->i2c->dev) == 0) {
-        //if(gVibDebugLog&0x0010)//check break status
+        if(gVibDebugLog&0x0010)//check break status
             DbgOut((DBL_INFO, "%s: (4)fw_name= %s ,bin_num=%d, repeat=%d, break=%d, queuework...\n",__func__, dw791x->fwName, dw791x->bin_num, dw791x->repeat, dw791x->bRTP_Play_Break));
         queue_work(dw791x->rtp_workqueue, &dw791x->rtp_work);
     }
@@ -3618,7 +3619,7 @@ static ssize_t rtp_play_repeat_store(struct device *dev,
     {
         DbgOut((DBL_INFO, "%s: (4)fw_name= %s ,bin_num=%d, repeat=%d, break=%d, request_firmware failed!\n",__func__, dw791x->fwName, dw791x->bin_num, dw791x->repeat, dw791x->bRTP_Play_Break));
     }
-	//if(gVibDebugLog&0x0010)//store node debug
+	if(gVibDebugLog&0x0010)//store node debug
 		DbgOut((DBL_INFO, "%s:(1) channel=%d, num=%d, repeat=%d ---\n", __func__, channel, val, repeat));
 	return count;
 }
