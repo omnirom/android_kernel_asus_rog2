@@ -79,7 +79,7 @@
 #define GOODIX_MAX_TP_KEY  4
 #define GOODIX_MAX_PEN_KEY 2
 
-#define FW_9896		"06.00.00.f4"
+#define FW_9896		"06.00.00.32"
 /*
  * struct goodix_module - external modules container
  * @head: external modules list

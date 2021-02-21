@@ -1947,7 +1947,7 @@ static inline void set_task_cpu(struct task_struct *p, unsigned int cpu)
 #endif
 
 extern long msm_sched_setaffinity(pid_t pid, struct cpumask *new_mask);
-extern long sched_setaffinity(pid_t pid, const struct cpumask *new_mask);
+extern long sched_setaffinity(pid_t pid, struct cpumask *new_mask); //ASUS_BSP
 extern long sched_getaffinity(pid_t pid, struct cpumask *mask);
 
 #ifndef TASK_SIZE_OF

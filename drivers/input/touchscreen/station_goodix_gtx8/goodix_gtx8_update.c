@@ -69,9 +69,7 @@
 #define TS_READ_FLASH_STATE_RETRY_TIMES    200
 
 #define Station_TP_RST 0x35
-#ifdef CONFIG_TOUCHSCREEN_GOODIX_GTX8_SUPPORT
 extern int ec_i2c_set_gpio(u8 gpio, u8 value);
-#endif
 bool goodix_fw_update_thread_finish = false;
 bool fwm_int = false;
 int fw_update_count = 0;
@@ -530,12 +528,10 @@ static int goodix_update_prepare(struct fw_update_ctrl *fwu_ctrl)
 	fwu_ctrl->allow_reset = true;
 	ts_info("firmware update, reset");
 
-#ifdef CONFIG_TOUCHSCREEN_GOODIX_GTX8_SUPPORT	
 	ec_i2c_set_gpio(Station_TP_RST, 0);
 	udelay(2000);
 	ec_i2c_set_gpio(Station_TP_RST, 1);
 	usleep_range(10000, 11000);
-#endif	
 
 	fwu_ctrl->allow_reset = false;
 

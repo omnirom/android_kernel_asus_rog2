@@ -44,10 +44,8 @@
 
 #define Station_TP_RST 0x35
 
-#ifdef CONFIG_TOUCHSCREEN_GOODIX_GTX8_SUPPORT
 extern int ec_i2c_set_gpio(u8 gpio, u8 value);
 
-#endif
 
 static int goodix_ts_remove(struct platform_device *pdev);
 int goodix_start_later_init(struct goodix_ts_core *ts_core);
@@ -85,6 +83,8 @@ extern int fw_update_count;
 int update_progress = 0;
 //int drm_registed = 0;
 int input_dev_add = 0;
+extern int station_touch_recovery;
+
 /**
  * __do_register_ext_module - register external module
  * to register into touch core modules structure
@@ -1492,12 +1492,10 @@ static int goodix_ts_gpio_setup(struct goodix_ts_core *core_data)
 
 	
 	ts_info("GPIO setup, irq-gpio:%d", ts_bdata->irq_gpio);
-#ifdef CONFIG_TOUCHSCREEN_GOODIX_GTX8_SUPPORT
 	ec_i2c_set_gpio(Station_TP_RST, 0);
 	udelay(10000);
 	ec_i2c_set_gpio(Station_TP_RST, 1);
 	msleep(100);
-#endif
 
 	r = devm_gpio_request_one(&core_data->pdev->dev, ts_bdata->irq_gpio,
 				  GPIOF_IN, "station_ts_irq_gpio");
@@ -1675,12 +1673,12 @@ static void goodix_ts_esd_work(struct work_struct *work)
 
 	if (!atomic_read(&ts_esd->esd_on))
 		return;
-#ifdef CONFIG_TOUCHSCREEN_GOODIX_GTX8_SUPPORT		  
+
 	if (gDongleType == 0 || gDongleType == 200) {
 		ts_info("Phone has been removed from station.");
 		return;
 	}
-#endif
+
 	if (hw_ops->check_hw)
 		r = hw_ops->check_hw(core->ts_dev);
 	if (r < 0) {
@@ -1785,13 +1783,11 @@ int goodix_ts_esd_init(struct goodix_ts_core *core)
 		ts_info("missing key info for esd check");
 		return 0;
 	}
-	
-#ifdef CONFIG_TOUCHSCREEN_GOODIX_GTX8_SUPPORT		  
+
 	if (gDongleType == 0 || gDongleType == 200) {
 		ts_info("Phone has been removed from station.");
 		return 0;
 	}
-#endif
 
 	INIT_DELAYED_WORK(&ts_esd->esd_work, goodix_ts_esd_work);
 	ts_esd->ts_core = core;
@@ -2336,12 +2332,16 @@ static int goodix_generic_noti_callback(struct notifier_block *self,
 		r = hw_ops->read_version(ts_dev, &ts_dev->chip_version);
 		if (r < 0)
 			ts_info("failed read fw version info[ignore]");
+
+		station_touch_recovery = 0;
 		break;
 	case NOTIFY_FWUPDATE_FAILED:
 		ts_info("FW update failed");
+		station_touch_recovery = 2;
 		break;	
 	case NOTIFY_FWUPDATE_PROGRESS:
 	        update_progress +=fw_update_count;
+		station_touch_recovery = 1;
 	        ts_info("NOTIFY_FWUPDATE_PROGRESS FW updating %d",update_progress);
 	        break;
 	case NOTIFY_CFG_BIN_FAILED :
@@ -2658,6 +2658,7 @@ int goodix_ts_core_init_fw(struct goodix_ts_core *core_data)
 {
 	ts_info("FW module init");
         goodix_ts_fw_update = 1;
+	station_touch_recovery = 1;
 	goodix_fwu_module_init();
 	return 0;
 }
@@ -2682,6 +2683,7 @@ static void __exit goodix_ts_module_exit(void)
 		goodix_fwu_module_exit();
 		goodix_ts_fw_update = 0;
 	    }
+	    station_touch_recovery = 0;
 	    platform_driver_unregister(&goodix_ts_driver);
 	    goodix_ts_dev_release();
 	}

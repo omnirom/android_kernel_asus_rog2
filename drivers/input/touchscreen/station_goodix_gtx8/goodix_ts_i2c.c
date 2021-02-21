@@ -97,10 +97,8 @@ u32 GoodixTSTimeStamp = 0;
 //station +++ 
 #define Station_TP_RST 0x35
 
-#ifdef CONFIG_TOUCHSCREEN_GOODIX_GTX8_SUPPORT
 extern int ec_i2c_set_gpio(u8 gpio, u8 value);
 extern uint8_t gDongleType;
-#endif
 
 extern struct drm_panel *active_panel_asus_station;
 struct device_node *g_np;
@@ -323,12 +321,11 @@ static int goodix_ts_dev_confirm(struct goodix_ts_device *ts_dev)
 
 	for (retry = 0; retry < DEV_CONFIRM_RETRY; retry++) {
 
-#ifdef CONFIG_TOUCHSCREEN_GOODIX_GTX8_SUPPORT		
 		ec_i2c_set_gpio(Station_TP_RST, 0);
 		udelay(2000);
 		ec_i2c_set_gpio(Station_TP_RST, 1);
 		msleep(100);
-#endif
+
 		if (!goodix_i2c_test(ts_dev)) {
 			msleep(95);
 			return 0;
@@ -386,14 +383,11 @@ int goodix_i2c_read_trans(struct goodix_ts_device *dev, unsigned int reg,
 		msgs[1].len = transfer_length;
 
 		for (retry = 0; retry < GOODIX_BUS_RETRY_TIMES; retry++) {
-
-#ifdef CONFIG_TOUCHSCREEN_GOODIX_GTX8_SUPPORT		  
 			if (gDongleType == 0 || gDongleType == 200) {
 				ts_info("Phone has been removed from station.");
 				r = -EBUS;
 				goto read_exit;
 			}
-#endif
 			if (likely(i2c_transfer(client->adapter,
 						msgs, 2) == 2)) {
 				memcpy(&data[pos], msgs[1].buf,
@@ -402,9 +396,7 @@ int goodix_i2c_read_trans(struct goodix_ts_device *dev, unsigned int reg,
 				address += transfer_length;
 				break;
 			}
-#ifdef CONFIG_TOUCHSCREEN_GOODIX_GTX8_SUPPORT			
 			ts_info("I2c read retry[%d]:0x%x gDongleType=%d", retry + 1, reg, gDongleType);
-#endif		
 			msleep(20);
 		}
 		if (unlikely(retry == GOODIX_BUS_RETRY_TIMES)) {
@@ -465,13 +457,11 @@ int goodix_i2c_write_trans(struct goodix_ts_device *dev, unsigned int reg,
 		memcpy(&msg.buf[2], &data[pos], transfer_length);
 
 		for (retry = 0; retry < GOODIX_BUS_RETRY_TIMES; retry++) {
-#ifdef CONFIG_TOUCHSCREEN_GOODIX_GTX8_SUPPORT		  
 			if (gDongleType == 0 || gDongleType == 200) {
 				ts_info("Phone has been removed from station.");
 				r = -EBUS;
 				goto write_exit;
 			}
-#endif			
 		  
 			if (likely(i2c_transfer(client->adapter,
 						&msg, 1) == 1)) {
@@ -526,13 +516,11 @@ static int goodix_set_i2c_doze_mode(struct goodix_ts_device *dev, int enable)
 		if (doze_mode_set_count == 0) {
 			w_data = TS_DOZE_ENABLE_DATA;
 			for (i = 0; i < TS_DOZE_ENABLE_RETRY_TIMES; i++) {
-#ifdef CONFIG_TOUCHSCREEN_GOODIX_GTX8_SUPPORT			  
 				if (gDongleType == 0 || gDongleType == 200) {
 					ts_info("Phone has been removed from station. | TS_DOZE_ENABLE_RETRY_TIMES");
 					result = 0;
 					goto exit;
 				}
-#endif							  
 				result = goodix_i2c_write_trans(dev,
 						TS_REG_DOZE_CTRL, &w_data, 1);
 				if (!result) {
@@ -555,24 +543,20 @@ static int goodix_set_i2c_doze_mode(struct goodix_ts_device *dev, int enable)
 
 		if (doze_mode_set_count == 1) {
 			w_data = TS_DOZE_DISABLE_DATA;
-#ifdef CONFIG_TOUCHSCREEN_GOODIX_GTX8_SUPPORT	  
 		if (gDongleType == 0 || gDongleType == 200) {
 			ts_info("Phone has been removed from station");
 			result = 0;
 			goto exit;
 		}
-#endif				  				
 			goodix_i2c_write_trans(dev, TS_REG_DOZE_CTRL,
 					       &w_data, 1);
 			usleep_range(1000, 1100);
 			for (i = 0; i < TS_DOZE_DISABLE_RETRY_TIMES; i++) {
-#ifdef CONFIG_TOUCHSCREEN_GOODIX_GTX8_SUPPORT			  
 				if (gDongleType == 0 || gDongleType == 200) {
 					ts_info("Phone has been removed from station. | TS_DOZE_DISABLE_RETRY_TIMES");
 					result = 0;
 					goto exit;
 				}
-#endif			  
 				goodix_i2c_read_trans(dev,
 						TS_REG_DOZE_STAT, &r_data, 1);
 				if (TS_DOZE_CLOSE_OK_DATA == r_data) {
@@ -580,13 +564,11 @@ static int goodix_set_i2c_doze_mode(struct goodix_ts_device *dev, int enable)
 					goto exit;
 				} else if (0xAA != r_data) {
 					w_data = TS_DOZE_DISABLE_DATA;
-#ifdef CONFIG_TOUCHSCREEN_GOODIX_GTX8_SUPPORT			  
 				if (gDongleType == 0 || gDongleType == 200) {
 					ts_info("Phone has been removed from station. | TS_DOZE_DISABLE_RETRY_TIMES");
 					result = 0;
 					goto exit;
 				}
-#endif					
 					goodix_i2c_write_trans(dev,
 						TS_REG_DOZE_CTRL, &w_data, 1);
 				}
@@ -948,14 +930,11 @@ static int _do_goodix_send_config(struct goodix_ts_device *dev,
 	/*1. Inquire command_reg until it's free*/
 	for (try_times = 0; try_times < TS_WAIT_CMD_FREE_RETRY_TIMES;
 	     try_times++) {
-
-#ifdef CONFIG_TOUCHSCREEN_GOODIX_GTX8_SUPPORT
 	  if (gDongleType == 0 || gDongleType == 200) {
 			ts_info("Phone has been removed from station. (1)");
 			r = -EINVAL;
 			goto exit;
 		}
-#endif		  
 		if (!goodix_i2c_read(dev, command_reg, buf, 1) &&
 		    buf[0] == TS_CMD_REG_READY)
 			break;
@@ -1006,14 +985,11 @@ static int _do_goodix_send_config(struct goodix_ts_device *dev,
 		/*6. wait 0x7f or 0x7e */
 		for (try_times = 0; try_times < TS_WAIT_CMD_FREE_RETRY_TIMES;
 		     try_times++) {
-
-#ifdef CONFIG_TOUCHSCREEN_GOODIX_GTX8_SUPPORT	  
 		if (gDongleType == 0 || gDongleType == 200) {
 			ts_info("Phone has been removed from station. (6)");
 			r = -EINVAL;
 			goto exit;
 		}
-#endif				  
 
 			r = goodix_i2c_read(dev, command_reg, buf, 3);
 			if (!r && (buf[0] == TS_CMD_CFG_ERR ||
@@ -1180,13 +1156,11 @@ static int goodix_read_config_ys(struct goodix_ts_device *dev,
 	int i;
 	int ret;
 
-#ifdef CONFIG_TOUCHSCREEN_GOODIX_GTX8_SUPPORT	  
 		if (gDongleType == 0 || gDongleType == 200) {
 			ts_info("Phone has been removed from station");
 			ret = -EINVAL;
 			goto err_out;
 		}
-#endif				  	
 	
 	ret = goodix_i2c_read(dev, cfg_addr, buf, TS_CFG_HEAD_LEN_YS);
 	if (ret)
@@ -1252,13 +1226,11 @@ static int goodix_read_config_nor(struct goodix_ts_device *dev,
 		ret = -EINVAL;
 		goto err_out;
 	}
-#ifdef CONFIG_TOUCHSCREEN_GOODIX_GTX8_SUPPORT	  
 		if (gDongleType == 0 || gDongleType == 200) {
 			ts_info("Phone has been removed from station");
 			ret = -EINVAL;
 			goto err_out;
 		}
-#endif				  	
 
 	ret = goodix_i2c_read(dev, cfg_addr, buf, TS_CFG_HEAD_LEN);
 	if (ret)
@@ -1277,13 +1249,11 @@ static int goodix_read_config_nor(struct goodix_ts_device *dev,
 	ts_info("config_version:%u, vub_bags:%u", buf[0], sub_bags);
 	for (i = 0; i < sub_bags; i++) {
 		/* read sub head [0]: sub bag num, [1]: sub bag length */
-#ifdef CONFIG_TOUCHSCREEN_GOODIX_GTX8_SUPPORT	  
 		if (gDongleType == 0 || gDongleType == 200) {
 			ts_info("Phone has been removed from station");
 			ret = -EINVAL;
 			goto err_out;
 		}
-#endif				  			
 		ret = goodix_i2c_read(dev, cfg_addr + offset, buf + offset, 2);
 		if (ret)
 			goto err_out;
@@ -1293,13 +1263,11 @@ static int goodix_read_config_nor(struct goodix_ts_device *dev,
 
 		ts_debug("sub bag num:%u,sub bag length:%u",
 			 buf[offset], subbag_len);
-#ifdef CONFIG_TOUCHSCREEN_GOODIX_GTX8_SUPPORT	  
 		if (gDongleType == 0 || gDongleType == 200) {
 			ts_info("Phone has been removed from station");
 			ret = -EINVAL;
 			goto err_out;
 		}
-#endif				  			
 		ret = goodix_i2c_read(dev, cfg_addr + offset + 2,
 				      buf + offset + 2, subbag_len + 1);
 		if (ret)
@@ -1352,13 +1320,11 @@ static int goodix_read_config(struct goodix_ts_device *dev,
 	/* wait for IC in IDLE state */
 	for (i = 0; i < TS_WAIT_CMD_FREE_RETRY_TIMES; i++) {
 		cmd_flag = 0;
-#ifdef CONFIG_TOUCHSCREEN_GOODIX_GTX8_SUPPORT	  
 		if (gDongleType == 0 || gDongleType == 200) {
 			ts_info("Phone has been removed from station");
 			r = -EINVAL;
 			goto exit;
 		}
-#endif				  	
 		
 		r = goodix_i2c_read(dev, cmd_reg, &cmd_flag, 1);
 		ts_info("wait for IC in IDLE state 0x%x",cmd_reg);
@@ -1421,12 +1387,10 @@ int goodix_hw_reset(struct goodix_ts_device *dev)
 
 	ts_info("HW reset start");
 
-#ifdef CONFIG_TOUCHSCREEN_GOODIX_GTX8_SUPPORT		
 	ec_i2c_set_gpio(Station_TP_RST, 0);
 	udelay(2000);
 	ec_i2c_set_gpio(Station_TP_RST, 1);
 	msleep(100);
-#endif		
 
 	/*init dynamic esd*/
 	if (dev->reg.esd) {

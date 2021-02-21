@@ -1334,6 +1334,35 @@ static ssize_t start_ec_adc_measure_store(struct device *dev,
 	return count;
 }
 
+static ssize_t touch_recovery_status(struct device *dev,
+					 struct device_attribute *mattr,
+					 char *buf)
+{
+	printk("[EC_HID] Station auto recovery : %d\n", station_touch_recovery);
+	return sprintf(buf, "%d\n", station_touch_recovery);
+}
+
+static ssize_t touch_recovery_store(struct device *dev,
+					struct device_attribute *mattr,
+					const char *data, size_t count)
+{
+	int ret = 0;
+	u32 val;
+
+	ret = kstrtou32(data, 10, &val);
+	if (ret)
+		return ret;
+
+	if (val == 1)
+		station_touch_recovery = 1;
+	else if (val == 2)
+		station_touch_recovery = 2;
+	else
+		station_touch_recovery = 0;
+
+	return count;
+}
+
 static DEVICE_ATTR(gDongleType, S_IRUGO | S_IWUSR, gDongleType_show, gDongleType_store);
 static DEVICE_ATTR(lock, S_IRUGO | S_IWUSR, lock_show, lock_store);
 static DEVICE_ATTR(members, S_IRUGO | S_IWUSR, register_member_show, NULL);
@@ -1347,6 +1376,7 @@ static DEVICE_ATTR(pogo_detect, S_IRUGO | S_IWUSR, pogo_detect_show, pogo_detect
 static DEVICE_ATTR(pogo_id_voltage, S_IRUGO | S_IWUSR, pogo_id_voltage_show, NULL);
 static DEVICE_ATTR(pogo_sync_key, S_IRUGO | S_IWUSR, pogo_sync_key_show, pogo_sync_key_store);
 static DEVICE_ATTR(is_ec_has_removed, S_IRUGO | S_IWUSR, is_ec_has_removed_show, is_ec_has_removed_store);
+static DEVICE_ATTR(touch_recovery, S_IRUGO | S_IWUSR, touch_recovery_status, touch_recovery_store);
 
 static struct attribute *ec_hid_attrs[] = {
 	&dev_attr_gDongleType.attr,
@@ -1362,6 +1392,7 @@ static struct attribute *ec_hid_attrs[] = {
 	&dev_attr_pogo_id_voltage.attr,
 	&dev_attr_pogo_sync_key.attr,
 	&dev_attr_is_ec_has_removed.attr,
+	&dev_attr_touch_recovery.attr,
 	NULL
 };
 

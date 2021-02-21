@@ -84,6 +84,10 @@ EXPORT_SYMBOL(hid_used);
 bool suspend_by_hall = false;
 EXPORT_SYMBOL(suspend_by_hall);
 
+// Sync update status with Station touch
+int station_touch_recovery = 0;
+EXPORT_SYMBOL(station_touch_recovery);
+
 #define MAX_MEMBERS 10
 struct vote_member {
 	int id;
