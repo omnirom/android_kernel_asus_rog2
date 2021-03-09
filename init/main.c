@@ -289,7 +289,7 @@ static int get_country_code(char *str)
     else if ( strcmp("EU", str) == 0 )
         g_Country_EU = true;
     else if ( strcmp("CN", str) == 0 )
-        g_Country_CN = true;
+        g_Country_EU = true;
 
 	printk("androidboot.country_code=%s\n", str);
     return 0;
