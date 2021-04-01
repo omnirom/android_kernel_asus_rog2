@@ -39,7 +39,7 @@
 struct drm_display_mode *gDispMode;
 bool gFirstBoot = true;
 bool changeFps = false;
-int lastFps = 120;
+int lastFps = 144;
 EXPORT_SYMBOL(lastFps);
 extern bool g_enter_AOD;
 extern bool g_allow_dfps;

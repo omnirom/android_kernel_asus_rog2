@@ -256,7 +256,8 @@ static void dp_catalog_ctrl_update_vx_px_v420(struct dp_catalog_ctrl *ctrl,
 	value0 |= BIT(5);
 	value1 |= BIT(5);
 
-    if (is_station && lastFps == 120 && v_level == 0 && p_level == 0) {
+    if (is_station && lastFps == 144 && lastFps == 120
+                   && v_level == 0 && p_level == 0) {
         value0 = 0x30;
         pr_err("Change swing to 0x30 for v0p0\n");
     }

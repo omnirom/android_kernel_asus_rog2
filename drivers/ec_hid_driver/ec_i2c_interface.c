@@ -605,8 +605,10 @@ static ssize_t restore_display_config_store(struct device *dev,
 		i2c_set_display_fps(2);
 	else if (lastFps >= 90 && lastFps < 120)
 		i2c_set_display_fps(1);
-	else if (lastFps == 120)
+	else if (lastFps >= 120 && lastFps < 144)
 		i2c_set_display_fps(0);
+	else if (lastFps == 144)
+		i2c_set_display_fps(3);
 
 	bl_level = get_last_backlight_value();
 	bl_ch[0]=(char)(bl_level & 0xFF);
@@ -1845,8 +1847,10 @@ static int ec_i2c_probe(struct i2c_client *client, const struct i2c_device_id *i
 			i2c_set_display_fps(2);
 		else if (lastFps >= 90 && lastFps < 120)
 			i2c_set_display_fps(1);
-		else if (lastFps == 120)
+		else if (lastFps >= 120 && lastFps < 144)
 			i2c_set_display_fps(0);
+		else if (lastFps == 144)
+			i2c_set_display_fps(3);
 	}else {
 		printk("[EC_I2C] Is in charger mode.\n");
 	}

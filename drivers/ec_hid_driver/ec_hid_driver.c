@@ -1437,8 +1437,10 @@ void do_ec_porta_cc_connect(void)
 				ec_i2c_set_display_fps(2);
 			else if (lastFps >= 90 && lastFps < 120)
 				ec_i2c_set_display_fps(1);
-			else if (lastFps == 120)
+			else if (lastFps >= 120 && lastFps < 144)
 				ec_i2c_set_display_fps(0);
+			else if (lastFps == 144)
+				ec_i2c_set_display_fps(3);
 		}else {
 			printk("[EC_HID] Is in charger mode.\n");
 		}
