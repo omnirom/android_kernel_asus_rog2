@@ -1859,7 +1859,7 @@ static void asus_fixup_preferred(struct drm_connector *connector)
         if (cur_vrefresh < 60 || cur_vrefresh > target_refresh) {
             //pr_err("Fps not in range.\n");
             continue;
-        } else if (cur_vrefresh != 60 && cur_vrefresh != 90 && cur_vrefresh != 120) {
+        } else if (cur_vrefresh != 60 && cur_vrefresh != 90 && cur_vrefresh != 120 && cur_vrefresh != 144) {
             //pr_err("Fps not supported.\n");
             continue;
         }

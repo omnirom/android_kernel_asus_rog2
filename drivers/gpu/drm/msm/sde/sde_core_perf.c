@@ -177,7 +177,7 @@ static void _sde_core_perf_calc_crtc(struct sde_kms *kms,
 	}
 	
 	if (!g_first_clock_rate) {
-		if (lastFps == 90 || lastFps == 120)
+		if (lastFps == 90 || lastFps == 120 || lastFps == 144)
 			perf->core_clk_rate = 460000000;
 		else if (lastFps == 60)
 			perf->core_clk_rate = 345000000;
