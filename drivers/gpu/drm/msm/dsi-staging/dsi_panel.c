@@ -1785,6 +1785,7 @@ const char *cmd_set_prop_map[DSI_CMD_SET_MAX] = {
 	"qcom,mdss-dsi-qsync-on-commands",
 	"qcom,mdss-dsi-qsync-off-commands",
 	/* ASUS BSP Display +++ */
+	"qcom,mdss-dsi-144-command",
 	"qcom,mdss-dsi-120-command",
 	"qcom,mdss-dsi-90-command",
 	"qcom,mdss-dsi-60-command",
@@ -1823,6 +1824,7 @@ const char *cmd_set_state_map[DSI_CMD_SET_MAX] = {
 	"qcom,mdss-dsi-qsync-on-commands-state",
 	"qcom,mdss-dsi-qsync-off-commands-state",
 	/* ASUS BSP Display +++ */
+	"qcom,mdss-dsi-144-command-state",
 	"qcom,mdss-dsi-120-command-state",
 	"qcom,mdss-dsi-90-command-state",
 	"qcom,mdss-dsi-60-command-state",
@@ -4321,8 +4323,9 @@ error:
 /* ASUS BSP Display +++ */
 /* type 
  * 0: 120 fps
- * 1: 90  fps
+ * 1: 90 fps
  * 2: 60  fps
+ * 3: 144  fps
 */
 int dsi_panel_asusFps(struct dsi_panel *panel, int type)
 {
@@ -4340,9 +4343,11 @@ int dsi_panel_asusFps(struct dsi_panel *panel, int type)
 	if (type == 2)
 		cmd_type = DSI_CMD_SET_60;
 	else if (type == 1)
-		cmd_type = DSI_CMD_SET_90;		
+		cmd_type = DSI_CMD_SET_90;
+	else if (type == 3)
+		cmd_type = DSI_CMD_SET_144;
 	else
-		cmd_type = DSI_CMD_SET_120;
+		cmd_type = DSI_CMD_SET_120
 
 	rc = dsi_panel_tx_cmd_set(panel, cmd_type);
 	if (rc) {
@@ -4437,6 +4442,8 @@ void dsi_panel_bl_delay()
 		g_bl_delay = 90000;
 	else if (lastFps == 120)
 		g_bl_delay = 65000;
+	else if (lastFps == 144)
+		g_bl_delay = 55000;
 }
 
 int dsi_panel_set_hbm(struct dsi_panel *panel, bool enable)
