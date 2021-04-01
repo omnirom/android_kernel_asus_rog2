@@ -906,10 +906,10 @@ static bool ci_dpm_vblank_too_short(struct amdgpu_device *adev)
 	u32 vblank_time = amdgpu_dpm_get_vblank_time(adev);
 	u32 switch_limit = adev->mc.vram_type == AMDGPU_VRAM_TYPE_GDDR5 ? 450 : 300;
 
-	/* disable mclk switching if the refresh is >120Hz, even if the
+	/* disable mclk switching if the refresh is >144Hz, even if the
 	 * blanking period would allow it
 	 */
-	if (amdgpu_dpm_get_vrefresh(adev) > 120)
+	if (amdgpu_dpm_get_vrefresh(adev) > 144)
 		return true;
 
 	if (vblank_time < switch_limit)
