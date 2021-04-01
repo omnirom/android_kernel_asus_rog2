@@ -487,8 +487,10 @@ static void msm_atomic_helper_commit_modeset_enables(struct drm_device *dev,
 				type = 2;
 			else if (lastFps >= 90 && lastFps < 120)
 				type = 1;
-			else
+			else if (lastFps >= 120 && lastFps < 144)
 				type = 0;
+			else
+				type = 3;
 
 			drm_bridge_asusFps(connector->state->best_encoder->bridge, type);
 			changeFps = false;

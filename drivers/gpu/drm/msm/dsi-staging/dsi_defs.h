@@ -289,6 +289,7 @@ enum dsi_cmd_set_type {
 	DSI_CMD_SET_QSYNC_ON,
 	DSI_CMD_SET_QSYNC_OFF,
 	/* ASUS BSP Display +++ */
+	DSI_CMD_SET_144,
 	DSI_CMD_SET_120,
 	DSI_CMD_SET_90,
 	DSI_CMD_SET_60,

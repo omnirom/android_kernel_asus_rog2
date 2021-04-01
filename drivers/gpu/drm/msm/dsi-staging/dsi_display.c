@@ -1205,8 +1205,10 @@ int dsi_display_set_power(struct drm_connector *connector,
 			dsi_panel_asusFps(display->panel, 2);
 		else if (lastFps >= 90 && lastFps < 120)
 			dsi_panel_asusFps(display->panel, 1);
-		else if (lastFps == 120)
+		else if (lastFps >= 120 && lastFps < 144)
 			dsi_panel_asusFps(display->panel, 0);
+		else if (lastFps == 144)
+			dsi_panel_asusFps(display->panel, 3);
 		/* ASUS BSP Display --- */
 		break;
 	case SDE_MODE_DPMS_OFF:
@@ -5667,8 +5669,10 @@ static void set_dim_mode(int mode, int type)
 			dsi_display_asusFps(g_display, 2);
 		else if (lastFps >= 90 && lastFps < 120)
 			dsi_display_asusFps(g_display, 1);
-		else if (lastFps == 120)
+		else if (lastFps >= 120 && lastFps < 144)
 			dsi_display_asusFps(g_display, 0);
+		else if (lastFps == 144)
+			dsi_display_asusFps(g_display, 3);
 	}	
 	else if (mode == 1 && lastFps == 60) {
 		set_tcon_cmd(bank_0, sizeof(bank_0), type);
@@ -5685,7 +5689,12 @@ static void set_dim_mode(int mode, int type)
 		msleep(1);
 		dim[1] = pulse[1];	
 		set_tcon_cmd(dim, sizeof(dim), type);
-	} 
+	} else if (mode == 4 && lastFps == 144) {
+		set_tcon_cmd(bank, sizeof(bank), type);
+		msleep(1);
+		dim[1] = pulse[1];	
+		set_tcon_cmd(dim, sizeof(dim), type);
+	}
 	else {
 		pr_err("[Display] fps is not match.\n");
 	}
@@ -5710,7 +5719,9 @@ static ssize_t dim_mode_write(struct file *filp, const char *buff, size_t len, l
 			set_dim_mode(2, 0);
 		} else if (strncmp(messages, "3", 1) == 0) {
 			set_dim_mode(3, 0);
-		} else {
+		} else if (strncmp(messages, "4", 1) == 0) {
+			set_dim_mode(3, 0);
+		}else {
 			pr_err("[Display] don't match any dim mode.\n");
 		}
 	} else {
@@ -5782,6 +5793,8 @@ static ssize_t lcd_stage_read(struct file *file, char __user *buf,
 		lcd_stage = 1;
 	else if (strncmp(g_lcd_stage, "2", 1) == 0) 
 		lcd_stage = 2;
+	else if (strncmp(g_lcd_stage, "3", 1) == 0) 
+		lcd_stage = 3;
 	else 
 		lcd_stage = 2;
 		
@@ -5821,6 +5834,8 @@ void set_panel_aod_bl()
 	else if (strncmp(g_lcd_stage, "1", 1) == 0) 
 		g_alpm_bl = 337;
 	else if (strncmp(g_lcd_stage, "2", 1) == 0) 
+		g_alpm_bl = 256;
+	else if (strncmp(g_lcd_stage, "3", 1) == 0) 
 		g_alpm_bl = 256;
 	else 
 		g_alpm_bl = 256;
@@ -8176,8 +8191,10 @@ error:
 			dsi_panel_asusFps(display->panel, 2);
 		else if (lastFps >= 90 && lastFps < 120)
 			dsi_panel_asusFps(display->panel, 1);
-		else if (lastFps == 120)
+		else if (lastFps >= 120 && lastFps < 144)
 			dsi_panel_asusFps(display->panel, 0);
+		else if (lastFps == 144)
+			dsi_panel_asusFps(display->panel, 3);
 	}
 	/* ASUS BSP Display --- */
 	return rc;
