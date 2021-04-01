@@ -1205,8 +1205,10 @@ int dsi_display_set_power(struct drm_connector *connector,
 			dsi_panel_asusFps(display->panel, 2);
 		else if (lastFps >= 90 && lastFps < 120)
 			dsi_panel_asusFps(display->panel, 1);
-		else if (lastFps == 120)
+		else if (lastFps >= 120 && lastFps < 144)
 			dsi_panel_asusFps(display->panel, 0);
+		else if (lastFps == 144)
+			dsi_panel_asusFps(display->panel, 3);
 		/* ASUS BSP Display --- */
 		break;
 	case SDE_MODE_DPMS_OFF:
@@ -5664,11 +5666,13 @@ static void set_dim_mode(int mode, int type)
 	
 	if (mode == 0) {
 		if (lastFps >= 60 && lastFps < 90)
-			dsi_display_asusFps(g_display, 2);
+			dsi_panel_asusFps(g_display->panel, 2);
 		else if (lastFps >= 90 && lastFps < 120)
-			dsi_display_asusFps(g_display, 1);
-		else if (lastFps == 120)
-			dsi_display_asusFps(g_display, 0);
+			dsi_panel_asusFps(g_display->panel, 1);
+		else if (lastFps >= 120 && lastFps < 144)
+			dsi_panel_asusFps(g_display->panel, 0);
+		else if (lastFps == 144)
+			dsi_panel_asusFps(g_display->panel, 3);
 	}	
 	else if (mode == 1 && lastFps == 60) {
 		set_tcon_cmd(bank_0, sizeof(bank_0), type);
@@ -5680,7 +5684,7 @@ static void set_dim_mode(int mode, int type)
 		msleep(1);
 		set_tcon_cmd(dim_90, sizeof(dim_90), type);	
 	} 
-	else if (mode == 3 && lastFps == 120) {
+	else if (mode == 3 && lastFps == 120 || lastFps == 144) {
 		set_tcon_cmd(bank, sizeof(bank), type);
 		msleep(1);
 		dim[1] = pulse[1];	
@@ -8176,8 +8180,10 @@ error:
 			dsi_panel_asusFps(display->panel, 2);
 		else if (lastFps >= 90 && lastFps < 120)
 			dsi_panel_asusFps(display->panel, 1);
-		else if (lastFps == 120)
+		else if (lastFps >= 120 && lastFps < 144)
 			dsi_panel_asusFps(display->panel, 0);
+		else if (lastFps == 144)
+			dsi_panel_asusFps(display->panel, 3);
 	}
 	/* ASUS BSP Display --- */
 	return rc;
