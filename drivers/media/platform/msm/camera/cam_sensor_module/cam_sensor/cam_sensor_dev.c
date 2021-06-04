@@ -27,7 +27,8 @@ static long cam_sensor_subdev_ioctl(struct v4l2_subdev *sd,
 		rc = cam_sensor_driver_cmd(s_ctrl, arg);
 		break;
 	default:
-		CAM_ERR(CAM_SENSOR, "Invalid ioctl cmd: %d", cmd);
+		CAM_ERR_RATE_LIMIT_CUSTOM(CAM_SENSOR, 1, 5,"Invalid ioctl cmd: %d", cmd); //ASUS_BSP jason_yeh fix cam_err dmessage for testPocCVE_2016_8412
+//		CAM_ERR(CAM_SENSOR, "Invalid ioctl cmd: %d", cmd);
 		rc = -EINVAL;
 		break;
 	}
