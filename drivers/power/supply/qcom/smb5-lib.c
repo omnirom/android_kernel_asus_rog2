@@ -7322,7 +7322,7 @@ int asus_request_DPDM_flag(int enable) {
 EXPORT_SYMBOL(asus_request_DPDM_flag);
 
 //[+++]Add to update the VID when PD gets the correct PID
-void PD_notify_VID() {
+void PD_notify_VID(void) {
 	CHG_DBG("%s. Update VID on SIDE port", __func__);
 
 	schedule_delayed_work(&smbchg_dev->asus_set_flow_flag_work, 0);

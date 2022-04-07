@@ -22,7 +22,7 @@
 static int g_cam0_power_up = 0;
 static int g_cam1_power_up = 0;
 static int g_cam2_power_up = 0;
-int cam_sensor_is_power_up()
+int cam_sensor_is_power_up(void)
 {
 	return g_cam0_power_up | g_cam1_power_up | g_cam2_power_up;
 }

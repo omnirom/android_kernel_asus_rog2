@@ -5987,7 +5987,7 @@ static struct file_operations lcd_stage_ops = {
 	.read = lcd_stage_read,
 };
 
-void set_panel_dimming()
+void set_panel_dimming(void)
 {
 	static char dimming[2] = {0x53, 0x2C};
 
@@ -6005,7 +6005,7 @@ void set_panel_dimming()
 	g_bl_count++;
 }
 
-void set_panel_aod_bl()
+void set_panel_aod_bl(void)
 {
 	if (strncmp(g_lcd_stage, "0", 1) == 0)
 		g_alpm_bl = 112;
@@ -6033,7 +6033,7 @@ void set_panel_global_hbm(bool enable)
 	dsi_panel_set_global_hbm(g_display->panel, enable);
 }
 
-void set_panel_in_recovery()
+void set_panel_in_recovery(void)
 {
 	queue_delayed_work(display_recovery_workqueue, &display_recovery_work, msecs_to_jiffies(50));
 }
