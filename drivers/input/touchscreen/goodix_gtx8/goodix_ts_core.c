@@ -34,6 +34,7 @@
 #endif
 #include <linux/hrtimer.h>
 #include <linux/ktime.h>
+#include <linux/uaccess.h>
 #include "goodix_ts_core.h"
 
 #if LINUX_VERSION_CODE > KERNEL_VERSION(2, 6, 38)
@@ -1583,35 +1584,44 @@ static ssize_t read_station_mode_cfg_show(struct device *dev,
 	return snprintf(buf, PAGE_SIZE, "%02x",station_cfg_version);
 }
 
-static ssize_t disable_fod_state_show(struct device *dev,
-				     struct device_attribute *attr, char *buf)
+static ssize_t disable_fod_state_read(struct file *file, char __user *buf, size_t count, loff_t *ppos)
 {
-	struct goodix_ts_core *core_data =
-		dev_get_drvdata(dev);
-	
-	if(core_data == NULL)
-	  return snprintf(buf, PAGE_SIZE, "error\n");
+	int len = 0;
+	ssize_t ret = 0;
+	char *buff = NULL;
 
-        return snprintf(buf, PAGE_SIZE, "%d\n",core_data->disable_fod);
+	buff = kzalloc(100, GFP_KERNEL);
+	if (!buff)
+		return -ENOMEM;
+
+	len += sprintf(buff, "%d\n", goodix_modules.core_data->disable_fod);
+	ret = simple_read_from_buffer(buf, count, ppos, buff, len);
+	kfree(buff);
+
+	return ret;
 }
 
-
-static ssize_t disable_fod_state_store(struct device *dev,
-				      struct device_attribute *attr, const char *buf, size_t count)
+static ssize_t disable_fod_state_write(struct file *filp, const char *buff, size_t len, loff_t *off)
 {
-  	struct goodix_ts_core *core_data = dev_get_drvdata(dev);
-	int en;
-	
-	if (sscanf(buf, "%d", &en) != 1)
-		return -EINVAL;
-    ts_info("system disable fod %d",en);
-	
-	if(en == 1)
-	  core_data->disable_fod = true;
-	else
-	  core_data->disable_fod = false;
+	char messages[256];
+	memset(messages, 0, sizeof(messages));
 
-	return count;
+	if (len > 256)
+		len = 256;
+	if (copy_from_user(messages, buff, len))
+		return -EFAULT;
+
+    if (strncmp(messages, "0", 1) == 0) {
+        if (goodix_modules.core_data->disable_fod) {
+            goodix_modules.core_data->disable_fod = false;
+        }
+    } else {
+        if (!goodix_modules.core_data->disable_fod) {
+            goodix_modules.core_data->disable_fod = true;
+        }
+    }
+
+    return len;
 }
 
 //ASUS_BSP "ASUS feactures" ---
@@ -1640,7 +1650,6 @@ static DEVICE_ATTR(dongle_state,S_IRUGO|S_IWUSR, NULL, dongle_state_store);
 static DEVICE_ATTR(test_cfg, S_IRUGO|S_IWUSR, NULL, test_cfg_store);
 static DEVICE_ATTR(load_station_cfg, S_IRUGO|S_IWUSR, NULL, load_station_cfg_store);
 static DEVICE_ATTR(read_station_cfg, S_IRUGO, read_station_mode_cfg_show, NULL);
-static DEVICE_ATTR(disable_fod_state,S_IRUGO|S_IWUSR, disable_fod_state_show, disable_fod_state_store);
 
 //ASUS_BSP "ASUS feactures" ---
 static struct attribute *sysfs_attrs[] = {
@@ -1666,8 +1675,12 @@ static struct attribute *sysfs_attrs[] = {
 	&dev_attr_test_cfg.attr,
 	&dev_attr_load_station_cfg.attr,
 	&dev_attr_read_station_cfg.attr,
-	&dev_attr_disable_fod_state.attr,
 	NULL,
+};
+
+static struct file_operations disable_fod_state_ops = {
+	.write = disable_fod_state_write,
+	.read  = disable_fod_state_read,
 };
 
 static const struct attribute_group sysfs_group = {
@@ -3355,6 +3368,8 @@ static int goodix_ts_probe(struct platform_device *pdev)
         INIT_WORK(&core_data->gts_resume_work, goodix_resume_work);
         INIT_WORK(&core_data->gts_suspend_work, goodix_suspend_work);
 	proc_symlink("driver/glove", NULL, "/sys/devices/platform/goodix_ts.0/glove_mode");
+	proc_create("driver/disable_fod", 0666, NULL, &disable_fod_state_ops);
+
 	gts_core_data = core_data;
 	init_success=1;
 
