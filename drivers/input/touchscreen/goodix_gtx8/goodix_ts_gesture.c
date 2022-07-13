@@ -670,6 +670,11 @@ static int report_gesture_key(struct input_dev *dev, char keycode)
 	} 
 
 	if(atomic_read(&gsx_gesture->aod_enable)==1) {
+		if (proximity_check_status()){
+			ts_info("P sensor enable, ignore gesture event");
+			return 2;
+		}
+
 	    if(keycode == 'F') {	        
 	        input_report_key(dev, KEY_F, 1);
 		input_sync(dev);
