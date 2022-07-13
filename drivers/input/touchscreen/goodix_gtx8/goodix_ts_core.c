@@ -3038,8 +3038,7 @@ void display_panel_off(int panel_off, int nolp)
 	   ts_info("phone state %d ingore_reset = %d nolp = %d",gts_core_data->phone_call_on,ingore_reset,nolp);
            if (ingore_reset == 1 && nolp ==1)
 	     ingore_reset = 0;
-	   
-	   gts_core_data->disable_fod = false;	   
+
            if (panel_off == 1) { //display panel off , touch suspend
 	          if(atomic_read(&gts_core_data->dsi_suspend) == 1){
 		    ts_info("touch already suspend");
