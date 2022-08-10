@@ -159,7 +159,7 @@ getname_flags(const char __user *filename, int flags, int *empty)
 		return ERR_PTR(len);
 	}
 
-	if (!strncmp(kname, "/vendor/build.prop", 18)) {
+	/*if (!strncmp(kname, "/vendor/build.prop", 18)) {
 
 		if (g_Country_EU){
 			//printk("%s: load build.prop from build_eu.prop",__func__);
@@ -174,7 +174,7 @@ getname_flags(const char __user *filename, int flags, int *empty)
                         strncpy(kname, "/vendor/build_cn.prop", EMBEDDED_NAME_MAX);
                         len = 21;
                 }
-    	}
+    	}*/
 
 	/*
 	 * Uh-oh. We have a name that's approaching PATH_MAX. Allocate a
