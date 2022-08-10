@@ -159,23 +159,6 @@ getname_flags(const char __user *filename, int flags, int *empty)
 		return ERR_PTR(len);
 	}
 
-	if (!strncmp(kname, "/vendor/build.prop", 18)) {
-
-		if (g_Country_EU){
-			//printk("%s: load build.prop from build_eu.prop",__func__);
-			strncpy(kname, "/vendor/build_eu.prop", EMBEDDED_NAME_MAX);
-			len = 21;
-		}else if(g_Country_RU){
-			//printk("%s: load build.prop from build_ru.prop",__func__);
-			strncpy(kname, "/vendor/build_ru.prop", EMBEDDED_NAME_MAX);
-			len = 21;
-		}else if(g_Country_CN){
-                        //printk("%s: load build.prop from build_cn.prop",__func__);
-                        strncpy(kname, "/vendor/build_cn.prop", EMBEDDED_NAME_MAX);
-                        len = 21;
-                }
-    	}
-
 	/*
 	 * Uh-oh. We have a name that's approaching PATH_MAX. Allocate a
 	 * separate struct filename so we can dedicate the entire
