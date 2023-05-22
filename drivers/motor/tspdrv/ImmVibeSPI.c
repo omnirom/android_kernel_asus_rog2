@@ -449,7 +449,7 @@ static void dw791x_vibrator_work_routine(struct work_struct *work)
         if(val>0){
             //play vibration
             DbgOut((DBL_INFO, "write tap_gamma_h1 header\n"));
-            dw791x_seq_write(dw791x->i2c, dw791x->mem_input,0x01,RAM_ADDR16,(u8*)tap_gamma_h1,5);
+            dw791x_seq_write(dw791x->i2c, dw791x->mem_input,0x01,RAM_ADDR16,(u8*)tap_gamma_h1_4,5);
             DbgOut((DBL_INFO, "write tap_gamma_pcm1 data\n"));
             dw791x_seq_write(dw791x->i2c, dw791x->mem_input,0x027C,RAM_ADDR16,(u8*)tap_gamma_pcm1,sizeof(tap_gamma_pcm1));
             
@@ -3942,7 +3942,7 @@ static ssize_t activate_store(struct device *dev,
     mutex_lock(&dw791x->dev_lock);
     if(val==1){
         DbgOut((DBL_INFO, "write tap_gamma_h1 header\n"));
-        dw791x_seq_write(dw791x->i2c, dw791x->mem_input,0x01,RAM_ADDR16,(u8*)tap_gamma_h1,5);
+        dw791x_seq_write(dw791x->i2c, dw791x->mem_input,0x01,RAM_ADDR16,(u8*)tap_gamma_h1_4,5);
         DbgOut((DBL_INFO, "write tap_gamma_pcm1 data\n"));
         dw791x_seq_write(dw791x->i2c, dw791x->mem_input,0x027C,RAM_ADDR16,(u8*)tap_gamma_pcm1,sizeof(tap_gamma_pcm1));
         dw791x_byte_write(dw791x->i2c, dw791x->play_mode, MEM);//set memory mode
